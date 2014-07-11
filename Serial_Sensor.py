@@ -5,7 +5,7 @@ CRLF = 0
 CR = 1
 LF = 2
 
-class SerialSensor:
+class SerialSensor2:
 	def __init__(self, name, serial_port, baud_rate=38400):
 		self.__serial_port = serial_port
 		self.__baud_rate = baud_rate
@@ -13,6 +13,7 @@ class SerialSensor:
 		self.__readings = 0.00
 		self.__units = 'N/A'
 		self.su__connection = Serial(serial_port, baud_rate, timeout=5, writeTimeout=5)#, parity=PARITY_NONE, stopbits=STOPBITS_ONE, bytesize=EIGHTBITS)
+
 
 
 	def send(self,command):
