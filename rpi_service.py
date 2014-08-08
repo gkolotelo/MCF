@@ -124,7 +124,7 @@ del printout
 print "Conecting to Mongo server..."
 try :
     client = pymongo.MongoClient(settings["settings"]["server"])
-    client.admin.authenticate("admin","cityfarm")
+    client.admin.authenticate(settings["settings"]["username"],settings["settings"]["password"])
     db = client[settings["settings"]["db_name"]]
     collection = db[settings["settings"]["board_name"]]
     print "Connected to ", collection.full_name
@@ -262,6 +262,10 @@ while True:
                 time.sleep((float(i.getWaitTime())/1000))
                 reading = i.readJSON() #Can throw exceptions
                 JSON_readings.update(reading)
+        if JSON_readings == {} and count > 2:
+            print "No data being sent, exiting."
+            logger.error("No data being sent, exiting.")
+            sys.exit(0)
         count += 1
         JSON_readings["date"] = now()
         collection.insert(JSON_readings)
@@ -274,11 +278,11 @@ while True:
         if sleep >= 0.0: time.sleep(sleep)
         else: print "Running at " + str(final_time - initial_time) + " seconds per reading, more than defined reading frequency. Make necessary adjustments."
     except SerialError, e:
-        print "Serial error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + e.errno
-        logger.error(("Serial error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
+        print "Serial error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
+        logger.error(("Serial error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
         if e.errno == 0:#Errno 0: Could not connect error, try to repair:
-            print "Could not connect to sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno
-            logger.error(("Could not connect to sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
+            print "Could not connect to sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
+            logger.error(("Could not connect to sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
             for _ in xrange(3):
                 if check_connection(True): #Try to repair connection
                     print "Fixed"
@@ -287,11 +291,11 @@ while True:
             if not check_connection(True): #If unable, disable sensor, and move on
                 i.enable(False)
                 print "Disabled sensor: " + e.sensor + ' @ ' + e.port
-                logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
+                logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
                 pass
         elif e.errno == 2:#Errno 2: Invalid data type error, try reading again:
-            print "Invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno
-            logger.error(("Invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
+            print "Invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno) + ' value read: ' + "'" + e.msg + "'"
+            logger.error(("Invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno) + ' value read: ' + e.msg))
             for _ in xrange(3):
                 try:
                     time.sleep(3)
@@ -304,8 +308,8 @@ while True:
                 pass
             except:#Still having problems, remove sensor
                 i.enable(False)
-                print "Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno
-                logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
+                print "Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
+                logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
         else:
             print "Unhandled error"
             logger.error("Unhandled error")

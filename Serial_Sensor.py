@@ -40,11 +40,12 @@ def listPorts():
 #1: Device not found
 #2: Invalid Data Type
 class SerialError(Exception):
-    def __init__(self, arg='Serial Exception',sensor = '', port='', errno=0):
+    def __init__(self, arg='Serial Exception',sensor = '', port='', errno=0, msg = ''):
         self.args = arg
         self.errno = errno
         self.port = port
         self.sensor = sensor
+        self.msg = msg
     def __str__(self):
         return repr('Serial sensor exception @ ' + self.sensor + " on " + self.port)
 
@@ -53,9 +54,9 @@ class SerialSensor:
     def __init__(self, name, units, serial_port, wait_time, baud_rate=38400):
         self.__serial_port = serial_port
         self.__baud_rate = baud_rate
-        self.__name = name
+        self.__name = name.replace(' ','')
         self.__readings = 0.00
-        self.__units = units
+        self.__units = units.replace(' ','')
         self.__wait_time = wait_time
         self.__last_read_string = ""
         self.__enabled = True
@@ -90,13 +91,13 @@ class SerialSensor:
                 if self.__connection.inWaiting() == 0: return ""
                 char = self.__connection.read(1)
                 string += char
+            self.__last_read_string = string
             return string
             #"old"#string = (__connection.read(__connection.inWaiting())) #read characters available in buffer  
         except:
             raise SerialError("Could not read sensor.", self.__name, self.__serial_port, 0)
 
     def readString(self, mode=CRLF):#Available modes CRLF, LF, CR
-        self.__last_read_string = ""
         string = self.readRaw()
         string = string[:string.find('\r')]
         if mode == CR:
@@ -106,7 +107,6 @@ class SerialSensor:
         else:
             string += '\r\n' # use CRLF as default
         self.__connection.flushInput()
-        self.__last_read_string = string
         return string
 
     def check_connection(self, repair=False):
@@ -140,18 +140,20 @@ class SerialSensor:
     def readValues(self):
         if self.check_connection() == False:
             raise SerialError("Could not connect to serial device", self.__name, self.__serial_port, 0)
-        string = self.readString(CRLF)
-        if string == "":return []
-        val_list = string.replace(' ','').split(',')
+        string = self.readString(CRLF)[:-2]
+        string = string.replace(' ','')
+        self.__last_read_string = string
+        if string == "": return []
+        val_list = string.split(',')
         try:
             values = [ float(i) for i in val_list]
         except ValueError, e:
-            raise SerialError("Ivalid data type", self.__name, self.__serial_port, 2)
+            raise SerialError("Ivalid data type", self.__name, self.__serial_port, 2, self.__last_read_string)
         return values
         
     def readJSON(self):
-        names = self.getName().replace(' ','').split(',')
-        units = self.getUnits().replace(' ','').split(',')
+        names = self.getName().split(',')
+        units = self.getUnits().split(',')
         values = self.readValues()
         json_dict = {}
         if (len(values) > len(names)): x = len(names)
@@ -183,7 +185,7 @@ class SerialSensor:
         return str(self.__units)
 
     def getLastString(self):
-        return str(self.__last_read_string)
+        return self.__last_read_string
 
     def getJSONSettings(self, name, value):
         return {"name":self.getName(), "units":self.getUnits(), "wait_time":self.getWaitTime(), "baud_rate":self.getBaud(), name:value}
