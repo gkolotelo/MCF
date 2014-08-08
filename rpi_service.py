@@ -274,19 +274,23 @@ while True:
         if sleep >= 0.0: time.sleep(sleep)
         else: print "Running at " + str(final_time - initial_time) + " seconds per reading, more than defined reading frequency. Make necessary adjustments."
     except SerialError, e:
+        print "Serial error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + e.errno
         logger.error(("Serial error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
         if e.errno == 0:#Errno 0: Could not connect error, try to repair:
+            print "Could not connect to sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno
             logger.error(("Could not connect to sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
             for _ in xrange(3):
                 if check_connection(True): #Try to repair connection
+                    print "Fixed"
                     logger.info("Fixed")
                     break
             if not check_connection(True): #If unable, disable sensor, and move on
                 i.enable(False)
-                logger.error("Disabled sensor:")
-                logger.error(e.sensor + ' @ ' + e.port)
+                print "Disabled sensor: " + e.sensor + ' @ ' + e.port
+                logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
                 pass
         elif e.errno == 2:#Errno 2: Invalid data type error, try reading again:
+            print "Invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno
             logger.error(("Invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
             for _ in xrange(3):
                 try:
@@ -300,10 +304,21 @@ while True:
                 pass
             except:#Still having problems, remove sensor
                 i.enable(False)
+                print "Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno
                 logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
         else:
+            print "Unhandled error"
             logger.error("Unhandled error")
             raise
     except:
+        print "Unhandled Exception, non SerialError in main while loop"
         logger.error("Unhandled Exception, non SerialError in main while loop")
         raise
+
+
+
+
+
+
+
+

@@ -193,44 +193,44 @@ while True:
         if sleep >= 0.0: time.sleep(sleep)
         else: logger.info("Running at " + str(final_time - initial_time) + " seconds per reading, more than defined reading frequency. Make necessary adjustments.")
     except SerialError, e:
-        logger.error(("SerialError occured, trying to fix connection" + e.sensor +' @ ' + e.port))
-        if e.errno == 0:#Could not Connect error
-            if check_connection(True): #Repair connection
-                logger.info("Fixed")
+        logger.error(("Serial error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
+        if e.errno == 0:#Errno 0: Could not connect error, try to repair:
+            logger.error(("Could not connect to sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
+            for _ in xrange(3):
+                if check_connection(True): #Try to repair connection
+                    logger.info("Fixed")
+                    break
+            if not check_connection(True): #If unable, disable sensor, and move on
+                i.enable(False)
+                logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
                 pass
-            elif check_connection(True): #Try again
-                logger.info("Fixed")
-                pass
-            else: #remove sensor from sensor list, and move on
-                sensors.remove(sensors.index(i))
-                logger.error("Removed sensor:")
-                logger.error(e.sensor + ' @ ' + e.port)
-                pass
-        elif e.errno == 2:#try reading again
-            logger.error("Invalid data type on sensor: " + i.getName())
-            time.sleep(5)#Wait a little
+        elif e.errno == 2:#Errno 2: Invalid data type error, try reading again:
+            logger.error(("Invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
+            for _ in xrange(3):
+                try:
+                    time.sleep(3)
+                    i.readJSON()
+                    break
+                except:
+                    pass
             try:
                 i.readJSON()
                 pass
             except:#Still having problems, remove sensor
-                sensors.remove(sensors.index(i))
-                logger.error("Removed sensor:")
-                logger.error(e.sensor + ' @ ' + e.port)
-                pass
-
+                i.enable(False)
+                logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + e.errno))
         else:
-            logger.error("Unhandled")
+            logger.error("Unhandled error")
             raise
-
     except:
-        #log exception, and raise
-        logger.error("Unhandled Exception, while loop2")
+        logger.error("Unhandled Exception, non SerialError in main while loop")
         raise
 
 
 
-                
 
-        
+
+
+
 
 
