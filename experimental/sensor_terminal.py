@@ -61,7 +61,7 @@ while True:
             while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
                 line = sys.stdin.readline()
                 if line:
-                    time.sleep(0.1a)
+                    time.sleep(0.01)
                     sensors[int(sensor)].send(line)
             time.sleep(0.1)
             read = sensors[int(sensor)].readRaw()

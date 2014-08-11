@@ -187,25 +187,25 @@ while True:
         count += 1
         JSON_readings["date"] = now()
         collection.insert(JSON_readings)
-        
         final_time = time.time()
         sleep = (reading_frequency - (final_time - initial_time))
         if sleep >= 0.0: time.sleep(sleep)
         else: logger.info("Running at " + str(final_time - initial_time) + " seconds per reading, more than defined reading frequency. Make necessary adjustments.")
+        
     except SerialError, e:
         logger.error(("Serial error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
         if e.errno == 0:#Errno 0: Could not connect error, try to repair:
             logger.error(("Could not connect to sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
             for _ in xrange(3):
-                if check_connection(True): #Try to repair connection
+                if i.check_connection(True): #Try to repair connection
                     logger.info("Fixed")
                     break
-            if not check_connection(True): #If unable, disable sensor, and move on
+            if not i.check_connection(True): #If unable, disable sensor, and move on
                 i.enable(False)
                 logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
                 pass
         elif e.errno == 2:#Errno 2: Invalid data type error, try reading again:
-            logger.error(("Invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
+            logger.error(("Invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno) + ' value read: ' + "'" + e.msg + "'"))
             for _ in xrange(3):
                 try:
                     time.sleep(3)

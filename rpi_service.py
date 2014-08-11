@@ -277,6 +277,7 @@ while True:
         sleep = (reading_frequency - (final_time - initial_time))
         if sleep >= 0.0: time.sleep(sleep)
         else: print "Running at " + str(final_time - initial_time) + " seconds per reading, more than defined reading frequency. Make necessary adjustments."
+        
     except SerialError, e:
         print "Serial error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
         logger.error(("Serial error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
@@ -284,18 +285,18 @@ while True:
             print "Could not connect to sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
             logger.error(("Could not connect to sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
             for _ in xrange(3):
-                if check_connection(True): #Try to repair connection
+                if i.check_connection(True): #Try to repair connection
                     print "Fixed"
                     logger.info("Fixed")
                     break
-            if not check_connection(True): #If unable, disable sensor, and move on
+            if not i.check_connection(True): #If unable, disable sensor, and move on
                 i.enable(False)
                 print "Disabled sensor: " + e.sensor + ' @ ' + e.port
                 logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
                 pass
         elif e.errno == 2:#Errno 2: Invalid data type error, try reading again:
             print "Invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno) + ' value read: ' + "'" + e.msg + "'"
-            logger.error(("Invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno) + ' value read: ' + e.msg))
+            logger.error(("Invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno) + ' value read: ' + "'" + e.msg + "'"))
             for _ in xrange(3):
                 try:
                     time.sleep(3)

@@ -99,7 +99,10 @@ class SerialSensor:
 
     def readString(self, mode=CRLF):#Available modes CRLF, LF, CR
         string = self.readRaw()
-        string = string[:string.find('\r')]
+        if string.find('\r') == -1:
+            string = ""
+        else:
+            string = string[:string.find('\r')]
         if mode == CR:
             string += '\r'
         elif mode == LF:
@@ -142,8 +145,7 @@ class SerialSensor:
             raise SerialError("Could not connect to serial device", self.__name, self.__serial_port, 0)
         string = self.readString(CRLF)[:-2]
         string = string.replace(' ','')
-        self.__last_read_string = string
-        if string == "": return []
+        if len(string) == 0: return []
         val_list = string.split(',')
         try:
             values = [ float(i) for i in val_list]
