@@ -1,6 +1,5 @@
 from serial import Serial
 import serial
-#import usb
 import time
 from serial.tools.list_ports import comports
 
@@ -10,30 +9,6 @@ LF = 2
 
 def listPorts():
     return comports()
-
-# def getAvailableIDs(baud_rate):
-#     ports = listPorts()
-#     ret_dict = {}
-#     ids = []
-#     string = ""
-#     for i in ports:
-#         conn = Serial(i, baud_rate, timeout=5, writeTimeout=5)
-#         conn.write('I\r')
-#         conn.flushInput()
-#         conn.write('I\r')
-#         if conn.inWaiting() != 0:
-#             try:
-#                 while char != '\r':
-#                     if conn.inWaiting() == 0: return ""
-#                     char = conn.read(1)
-#                     string += char
-#                 ids.append(string)
-#                 string = ""
-#                 conn.flushInput()
-#     for i in ids:
-#         ret_dict[i] = ports[ports.find(i)]
-#.............................................
-
 
 #ERROR NUMBERS:
 #0: Could not connect

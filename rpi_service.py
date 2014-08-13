@@ -19,7 +19,7 @@ import subprocess
 import pymongo
 import logging
 import os
-from Serial_Sensor import *
+from serialsensor import *
 
 if (os.getuid() != 0):
     print "Must be run as superuser"
@@ -277,7 +277,7 @@ while True:
         sleep = (reading_frequency - (final_time - initial_time))
         if sleep >= 0.0: time.sleep(sleep)
         else: print "Running at " + str(final_time - initial_time) + " seconds per reading, more than defined reading frequency. Make necessary adjustments."
-        
+
     except SerialError, e:
         print "Serial error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
         logger.error(("Serial error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
