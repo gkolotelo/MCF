@@ -1,0 +1,8 @@
+[Unit]
+Description=rpi_service
+
+[Service]
+ExecStart=/root/rpi/rpi_sh.sh
+
+[Install]
+WantedBy=multi-user.target

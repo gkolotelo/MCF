@@ -27,7 +27,7 @@ if (os.getuid() != 0):
 
 sensors = []
 count = 0
-base_path = '/root/RPi/'
+base_path = '/root/rpi/'
 log_path  = base_path + 'log.log'
 config_path = base_path + 'config.json'
 sensor_reading_frequency = 0
