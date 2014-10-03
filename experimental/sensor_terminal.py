@@ -13,7 +13,7 @@ Attributes:
 import sys
 import os
 import select
-from Serial_Sensor import *
+from serialsensor import *
 
 if (os.getuid() != 0):
     print "Must be run as superuser"
