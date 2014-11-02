@@ -179,6 +179,11 @@ class SerialSensor:
             json_dict.update({names[i]: {"value": values[i], "units": units[i]}})
         return json_dict
 
+    def read(self):
+        self.send(self.read_command())
+        time.sleep(self.getWaitTime()/1000)
+        return readJSON()
+
     def getName(self):
         return str(self.__name)
 
