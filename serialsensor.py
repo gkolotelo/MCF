@@ -32,7 +32,7 @@ class SerialError(Exception):
 
 class SerialSensor:
     def __init__(self, name, units, serial_port, wait_time,
-                 read_command=None, baud_rate=38400, bytesize=8,
+                 baud_rate=38400, read_command=None, bytesize=8,
                  parity='N', stopbits=1, timeout=5, writeTimeout=5):
         """ Instatiates a sensor
 
@@ -55,8 +55,10 @@ class SerialSensor:
         self.__wait_time = wait_time
         self.__last_read_string = ""
         self.__enabled = True
+        self.read_command = read_command
         try:
-            self.__connection = Serial(serial_port, baud_rate, bytesize=bytesize, parity=parity, stopbits=stopbits, timeout=timeout, writeTimeout=writeTimeout)
+            self.__connection = Serial(serial_port, baud_rate, bytesize=bytesize, parity=parity,
+                                       stopbits=stopbits, timeout=timeout, writeTimeout=writeTimeout)
             self.__connection.write('\r')  # Sometimes first commands are read as error, this prevents that
         except serial.SerialException, e:
             raise SerialError("Could not connect to serial device", self.__name, self.__serial_port, 0)
@@ -88,6 +90,8 @@ class SerialSensor:
             raise SerialError("Timeout on device", self.__name, self.__serial_port, 0)
 
     def readRaw(self):
+        """readRaw() reads the serial buffer characters as ASCII characters up to a carriage return.
+        """
         try:
             string = ""
             char = ''
@@ -100,7 +104,6 @@ class SerialSensor:
                 string += char
             self.__last_read_string = string
             return string
-            # "old"#string = (__connection.read(__connection.inWaiting())) #read characters available in buffer
         except:
             raise SerialError("Could not read sensor.", self.__name, self.__serial_port, 0)
 
@@ -182,7 +185,7 @@ class SerialSensor:
     def read(self):
         self.send(self.read_command())
         time.sleep(self.getWaitTime()/1000)
-        return readJSON()
+        return self.readJSON()
 
     def getName(self):
         return str(self.__name)
@@ -209,4 +212,5 @@ class SerialSensor:
         return self.__last_read_string
 
     def getJSONSettings(self, name, value):
-        return {"name": self.getName(), "units": self.getUnits(), "wait_time": self.getWaitTime(), "baud_rate": self.getBaud(), name: value}
+        return {"name": self.getName(), "units": self.getUnits(), "wait_time": self.getWaitTime(),
+                "baud_rate": self.getBaud(), name: value}
