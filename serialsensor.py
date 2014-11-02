@@ -7,52 +7,81 @@ CRLF = 0
 CR = 1
 LF = 2
 
+
 def listPorts():
     return comports()
 
-#ERROR NUMBERS:
-#0: Could not connect
-#1: Device not found
-#2: Invalid Data Type
+# ERROR NUMBERS:
+# #0: Could not connect
+# #1: Device not found
+# #2: Invalid Data Type
+# #3: No data on receive buffer
+
+
 class SerialError(Exception):
-    def __init__(self, arg='Serial Exception',sensor = '', port='', errno=0, msg = ''):
+    def __init__(self, arg='Serial Exception', sensor='', port='', errno=0, msg=''):
         self.args = arg
         self.errno = errno
         self.port = port
         self.sensor = sensor
         self.msg = msg
+
     def __str__(self):
         return repr('Serial sensor exception @ ' + self.sensor + " on " + self.port)
 
 
 class SerialSensor:
-    def __init__(self, name, units, serial_port, wait_time, baud_rate=38400):
+    def __init__(self, name, units, serial_port, wait_time,
+                 read_command=None, baud_rate=38400, bytesize=8,
+                 parity='N', stopbits=1, timeout=5, writeTimeout=5):
+        """ Instatiates a sensor
+
+        Required Arguments:
+        name -- Name of the sensor/measurements (e.g. 'Temperature,Humidity').
+        units -- Units of the sensor/measurements (e.g. 'C,RH').
+        serial_port -- Serial port of the sensor (e.g. /dev/ttyUSBX).
+        wait_time -- Time to wait for response (in milliseconds).
+        read_command -- Function returning one string to be sent to sensor, if\
+        none defined read() method cannot be used. (e.g. lambda: 'R').
+
+        Optional Arguments:
+        baud_rate -- Baud rate of sensor (default 38400).
+        """
         self.__serial_port = serial_port
         self.__baud_rate = baud_rate
-        self.__name = name.replace(' ','')
+        self.__name = name.replace(' ', '')
         self.__readings = 0.00
-        self.__units = units.replace(' ','')
+        self.__units = units.replace(' ', '')
         self.__wait_time = wait_time
         self.__last_read_string = ""
         self.__enabled = True
-        try: 
-            self.__connection = Serial(serial_port, baud_rate, timeout=5, writeTimeout=5)#, parity=PARITY_NONE, stopbits=STOPBITS_ONE, bytesize=EIGHTBITS)
-            self.__connection.write('\r')#Sometimes first commands are read as error, this prevents that
+        try:
+            self.__connection = Serial(serial_port, baud_rate, bytesize=bytesize, parity=parity, stopbits=stopbits, timeout=timeout, writeTimeout=writeTimeout)
+            self.__connection.write('\r')  # Sometimes first commands are read as error, this prevents that
         except serial.SerialException, e:
             raise SerialError("Could not connect to serial device", self.__name, self.__serial_port, 0)
         except serial.SerialTimeoutException:
             raise SerialError("Timeout on device", self.__name, self.__serial_port, 0)
-        time.sleep(0.3)#Wait for receive buffer to fill
+        time.sleep(0.3)  # Wait for receive buffer to fill
         self.__connection.flushInput()
         self.__connection.flushInput()
+        time.sleep(0.1)
 
+    def send_hex(self, command):
+        self.__connection.flushInput()
+        time.sleep(0.1)
+        try:
+            self.__connection.write(command)
+        except serial.SerialTimeoutException:
+            raise SerialError("Timeout on device", self.__name, self.__serial_port, 0)
 
-    def send(self,command):
+    def send(self, command):
+        self.__connection.flushInput()
         if command[-1:] == '\n':
             command = command[:-1]
         if not command[-1:] == '\r':
-            command+='\r'
-        self.__connection.flushInput()
+            command += '\r'
+        time.sleep(0.1)
         try:
             self.__connection.write(command)
         except serial.SerialTimeoutException:
@@ -63,17 +92,25 @@ class SerialSensor:
             string = ""
             char = ''
             while char != '\r':
-                if self.__connection.inWaiting() == 0: return ""
+                if self.__connection.inWaiting() == 0:
+                    raise SerialError("No data on receive buffer.", self.__name, self.__serial_port, 3)
+                time.sleep(0.01)
                 char = self.__connection.read(1)
+                time.sleep(0.01)
                 string += char
             self.__last_read_string = string
             return string
-            #"old"#string = (__connection.read(__connection.inWaiting())) #read characters available in buffer  
+            # "old"#string = (__connection.read(__connection.inWaiting())) #read characters available in buffer
         except:
             raise SerialError("Could not read sensor.", self.__name, self.__serial_port, 0)
 
-    def readString(self, mode=CRLF):#Available modes CRLF, LF, CR
+    def read_hex(self):
         string = self.readRaw()
+        self.__connection.flushInput()
+
+    def readString(self, mode=CRLF):  # Available modes CRLF, LF, CR
+        string = self.readRaw()
+        self.__connection.flushInput()
         if string.find('\r') == -1:
             string = ""
         else:
@@ -83,8 +120,7 @@ class SerialSensor:
         elif mode == LF:
             string += '\n'
         else:
-            string += '\r\n' # use CRLF as default
-        self.__connection.flushInput()
+            string += '\r\n'  # use CRLF as default
         return string
 
     def check_connection(self, repair=False):
@@ -101,7 +137,7 @@ class SerialSensor:
         except serial.SerialException:
             pass
         self.__connection.close()
-        del __connection
+        del self.__connection
         time.sleep(0.7)
         try:
             self.__connection = Serial(self.__serial_port, self.__baud_rate, timeout=5, writeTimeout=5)
@@ -114,30 +150,33 @@ class SerialSensor:
             return False
         return self.__connection.isOpen()
 
-            
     def readValues(self):
-        if self.check_connection() == False:
+        if not self.check_connection():
             raise SerialError("Could not connect to serial device", self.__name, self.__serial_port, 0)
         string = self.readString(CRLF)[:-2]
-        string = string.replace(' ','')
-        if len(string) == 0: return []
+        string = string.replace(' ', '')
+        if len(string) == 0:
+            return []
         val_list = string.split(',')
         try:
-            values = [ float(i) for i in val_list]
+            values = [float(i) for i in val_list]
         except ValueError, e:
             raise SerialError("Ivalid data type", self.__name, self.__serial_port, 2, self.__last_read_string)
         return values
-        
+
     def readJSON(self):
         names = self.getName().split(',')
         units = self.getUnits().split(',')
         values = self.readValues()
         json_dict = {}
-        if (len(values) > len(names)): x = len(names)
-        elif (len(values) > len(units)): x = len(units)
-        else: x = len(values)
+        if (len(values) > len(names)):
+            x = len(names)
+        elif (len(values) > len(units)):
+            x = len(units)
+        else:
+            x = len(values)
         for i in range(x):
-            json_dict.update({names[i]:{"value":values[i], "units":units[i]}})
+            json_dict.update({names[i]: {"value": values[i], "units": units[i]}})
         return json_dict
 
     def getName(self):
@@ -165,5 +204,4 @@ class SerialSensor:
         return self.__last_read_string
 
     def getJSONSettings(self, name, value):
-        return {"name":self.getName(), "units":self.getUnits(), "wait_time":self.getWaitTime(), "baud_rate":self.getBaud(), name:value}
-
+        return {"name": self.getName(), "units": self.getUnits(), "wait_time": self.getWaitTime(), "baud_rate": self.getBaud(), name: value}
