@@ -8,7 +8,7 @@ Attributes:
     count: Variable to hold number of entries sent to DB.
 
 """
-
+from serial import termios
 import datetime
 import socket
 import json
@@ -28,7 +28,7 @@ if (os.getuid() != 0):
 sensors = []
 count = 0
 base_path = '/root/RPi/'
-log_path  = base_path + 'log.log'
+log_path = base_path + 'log.log'
 config_path = base_path + 'config.json'
 sensor_reading_frequency = 0
 
@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 handler = logging.FileHandler(log_path)
 handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 logger.info("\n\n\nStarted excecution:\n")
@@ -135,9 +135,11 @@ except pymongo.errors.ConnectionFailure:
     sys.exit(0)
 
 #Register board on server, if already registered, update information about board
-board_info = {"ip":socket.gethostbyname(socket.gethostname()), "hostname":socket.gethostname(), "sensor_reading_frequency":settings["settings"]["sensor_reading_frequency"], "server":settings["settings"]["server"], }
+board_info = {"ip":socket.gethostbyname(socket.gethostname()), "hostname":socket.gethostname(), 
+"sensor_reading_frequency":settings["settings"]["sensor_reading_frequency"], "server":settings["settings"]["server"], 
+"board_name":settings["settings"]["board_name"], "db_name":settings["settings"]["db_name"]}
 try:
-    client["admin"]["boards"].update({"name":settings["settings"]["board_name"]}, board_info)
+    client["admin"]["boards"].update({"board_name":settings["settings"]["board_name"], "db_name":settings["settings"]["db_name"]}, board_info)
 except:
     client["admin"]["boards"].insert(board_info)
 print "Added board info to server:"
@@ -260,12 +262,12 @@ logger.info("Reading Started")
 while True:
     try:
         initial_time = time.time()
-        JSON_readings = {} # clear dictionary for nex reading
+        JSON_readings = {}  # clear dictionary for nex reading
         for i in sensors:
             if i.isEnabled():
-                i.send('R') #Can throw exceptions 
+                i.send('R')  # Can throw exceptions
                 time.sleep((float(i.getWaitTime())/1000))
-                reading = i.readJSON() #Can throw exceptions
+                reading = i.readJSON()  # Can throw exceptions
                 JSON_readings.update(reading)
         if JSON_readings == {} and count > 2:
             print "No data being sent, exiting."
@@ -277,15 +279,77 @@ while True:
         print count
         print JSON_readings
         print '\n'
-        
         final_time = time.time()
         sleep = (sensor_reading_frequency - (final_time - initial_time))
         if sleep >= 0.0: time.sleep(sleep)
         else: print "Running at " + str(final_time - initial_time) + " seconds per reading, more than defined reading frequency. Make necessary adjustments."
 
     except SerialError, e:
-        print "Serial error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
-        logger.error(("Serial error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
+        if e.errno == 0:  # Errno 0: Could not connect error, try to repair:
+            print "Serial error occured, could not connect to sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
+            logger.error(("Serial error occured, could not connect to sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
+            for _ in xrange(3):
+                if i.check_connection(True):  # Try to repair connection
+                    print "Fixed"
+                    logger.info("Fixed")
+                    break
+            if not i.check_connection(True):  # If unable, disable sensor, and move on
+                i.enable(False)
+                print "Disabled sensor: " + e.sensor + ' @ ' + e.port
+                logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
+                pass
+        elif e.errno == 2:#Errno 2: Invalid data type error, try reading again:
+            print "Serial error occured, invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno) + ' value read: ' + "'" + e.msg + "'"
+            logger.error(("Serial error occured, invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno) + ' value read: ' + "'" + e.msg + "'"))
+            for _ in xrange(5):
+                try:
+                    time.sleep(2)
+                    i.send('R')
+                    time.sleep((float(i.getWaitTime())/1000) + 1)
+                    i.readRaw()
+                    break
+                except SerialError, e:
+                    pass
+            try:
+                i.send('R')
+                time.sleep((float(i.getWaitTime())/1000) + 1)
+                i.readRaw()
+                pass
+            except SerialError, e:#Still having problems, remove sensor
+                i.enable(False)
+                print "Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
+                logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
+        elif e.errno == 3:
+            print "Serial error occured, no data on receive buffer of sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
+            logger.error(("Serial error occured, no data on receive buffer of sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
+        else:
+            print "Serial error occured, unhandled SerialError error on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
+            logger.error("Serial error occured, unhandled SerialError error on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno))
+            raise
+
+    except pymongo.errors.AutoReconnect, e:
+        logger.error("Connection to database @ " + settings["settings"]["server"] + " Lost, trying to reconnect every 30 seconds up to 500 times")
+        print "Connection lost"
+        timeout = 500
+        i = 0
+        while i <= timeout:
+            try:
+                client.database_names()# try to reconnect
+                logger.info("Connection restabilished. Continuing...")
+                print "Connection restabilished. Continuing..."
+                i = timeout
+            except pymongo.errors.AutoReconnect, e:
+                if i == timeout:
+                    logger.error("Connection to database could not be restabilished. Now exiting...")
+                    print "Connection could not be restabilished"
+                    raise
+                    sys.exit(0) #Just in case raise doesn't raise
+                time.sleep(30)
+            i += 1
+
+    except termios.error, e:
+        print "Termios error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
+        logger.error(("Termios error occured, trying to fix connection of " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
         if e.errno == 0:#Errno 0: Could not connect error, try to repair:
             print "Could not connect to sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
             logger.error(("Could not connect to sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
@@ -299,36 +363,8 @@ while True:
                 print "Disabled sensor: " + e.sensor + ' @ ' + e.port
                 logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
                 pass
-        elif e.errno == 2:#Errno 2: Invalid data type error, try reading again:
-            print "Invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno) + ' value read: ' + "'" + e.msg + "'"
-            logger.error(("Invalid data type on sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno) + ' value read: ' + "'" + e.msg + "'"))
-            for _ in xrange(3):
-                try:
-                    time.sleep(3)
-                    i.readJSON()
-                    break
-                except:
-                    pass
-            try:
-                i.readJSON()
-                pass
-            except:#Still having problems, remove sensor
-                i.enable(False)
-                print "Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
-                logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
-        else:
-            print "Unhandled error"
-            logger.error("Unhandled error")
-            raise
+
     except:
         print "Unhandled Exception, non SerialError in main while loop"
         logger.error("Unhandled Exception, non SerialError in main while loop")
         raise
-
-
-
-
-
-
-
-
