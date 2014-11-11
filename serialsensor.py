@@ -19,7 +19,7 @@ def listPorts():
 
 
 class SerialError(Exception):
-    def __init__(self, arg='Serial Exception', sensor='', port='', errno=0, msg=''):
+    def __init__(self, arg='Serial Exception', sensor='', port='', errno=None, msg=''):  # Changed errno=0
         self.args = arg
         self.errno = errno
         self.port = port
@@ -27,7 +27,7 @@ class SerialError(Exception):
         self.msg = msg
 
     def __str__(self):
-        return repr('Serial sensor exception @ ' + self.sensor + " on " + self.port)
+        return repr('SerialSensor exception @ ' + self.sensor + " on " + self.port)
 
 
 class SerialSensor:
@@ -90,7 +90,8 @@ class SerialSensor:
             raise SerialError("Timeout on device", self.__name, self.__serial_port, 0)
 
     def readRaw(self):
-        """readRaw() reads the serial buffer characters as ASCII characters up to a carriage return.
+        """readRaw() reads the serial buffer as ASCII characters up to a carriage return.
+        If no character are read, a SerialError (Error #3) is raised.
         """
         try:
             string = ""
