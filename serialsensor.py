@@ -29,7 +29,7 @@ class SerialError(Exception):
         self.msg = msg
 
     def __str__(self):
-        return repr('SerialSensor Error: ' + self.args[0] + 'On sensor "' + self.sensor +
+        return repr('SerialSensor Error: ' + self.args[0] + ' On sensor "' + self.sensor +
                     '" @ "' + self.port + '" errno ' + str(self.errno) + self.msg)
 
 
