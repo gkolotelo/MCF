@@ -3,6 +3,8 @@ import serial
 import time
 from serial.tools.list_ports import comports
 
+version = "0.8 Build 1"
+
 CRLF = 0
 CR = 1
 LF = 2
@@ -27,7 +29,7 @@ class SerialError(Exception):
         self.msg = msg
 
     def __str__(self):
-        return repr('SerialSensor Error: ' + self.arg[0] + 'On sensor "' + self.sensor +
+        return repr('SerialSensor Error: ' + self.args[0] + 'On sensor "' + self.sensor +
                     '" @ "' + self.port + '" errno ' + str(self.errno) + self.msg)
 
 
