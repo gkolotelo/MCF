@@ -1,4 +1,5 @@
 #!/usr/bin/python2
+version = "0.8 Build 3"
 """
 Sensor Reader Script
 
@@ -59,6 +60,8 @@ def unhandled_exception_logger(type, value, traceback):
 sys.excepthook = unhandled_exception_logger  # Override sys.excepthook
 
 # Initialization
+print version
+logger.info(version)
 
 # Waits for internet connection.
 try:
@@ -103,10 +106,10 @@ except IOError, e:
             logger.info("Config file created")
         except IOError, e:
             print "Could not create file"
-            logger.error("Config file not found")
+            logger.exception("Config file not found")
             raise
     else:
-        logger.error("Config file not accessible, unhandled exception")
+        logger.exception("Config file not accessible, unhandled exception")
         raise
 sensor_reading_frequency = float(settings["settings"]["sensor_reading_frequency"])
 
@@ -242,7 +245,7 @@ except KeyboardInterrupt:  # Catch manual override
         logger.info("Added sensor to config file")
     except IOError:
         print "Cannot open settings file."
-        logger.error("Cannot open config file")
+        logger.exception("Cannot open config file")
         raise
     del number, name, units, wait, fp
 # cleanup unused variable
@@ -303,10 +306,8 @@ while True:
 
     except SerialError, e:
         if e.errno == 0:  # Errno 0: Could not connect error, try to repair:
-            print "Serial error occured, could not connect to sensor: " +\
-                  e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
-            logger.error(("Serial error occured, could not connect to sensor: " + e.sensor +
-                          ' @ ' + e.port + ' errno ' + str(e.errno)))
+            print e
+            logger.error(e)
             for _ in xrange(3):
                 if i.check_connection(True):  # Try to repair connection
                     print "Fixed"
@@ -318,10 +319,8 @@ while True:
                 logger.error(("Disabled sensor: " + e.sensor +
                               ' @ ' + e.port + ' errno ' + str(e.errno)))
         elif e.errno == 2:  # Errno 2: Invalid data type error, try reading again:
-            print "Serial error occured, invalid data type on sensor: " + e.sensor +\
-                  ' @ ' + e.port + ' errno ' + str(e.errno) + ' value read: ' + "'" + e.msg + "'"
-            logger.error(("Serial error occured, invalid data type on sensor: " + e.sensor +
-                          ' @ ' + e.port + ' errno ' + str(e.errno) + ' value read: ' + "'" + e.msg + "'"))
+            print e
+            logger.error(e)
             for _ in xrange(5):
                 try:
                     time.sleep(2)
@@ -338,14 +337,14 @@ while True:
                 pass
             except SerialError, e:  # Still having problems, remove sensor
                 i.enable(False)
-                print "Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)
-                logger.error(("Disabled sensor: " + e.sensor +' @ ' + e.port + ' errno ' + str(e.errno)))
+                print "Disabled sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
+                logger.error(("Disabled sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)))
         elif e.errno == 3:
-            print "Serial error occured, no data on receive buffer of sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
-            logger.error(("Serial error occured, no data on receive buffer of sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)))
+            print e
+            logger.error(e)
         else:
-            print "Serial error occured, unhandled SerialError error on sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
-            logger.error("Serial error occured, unhandled SerialError error on sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno))
+            print "SerialError occured, unhandled error on sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
+            logger.exception("SerialError occured, unhandled error on sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno))
             raise
 
     except pymongo.errors.AutoReconnect, e:
@@ -361,8 +360,8 @@ while True:
                 i = timeout
             except pymongo.errors.AutoReconnect, e:
                 if i == timeout:
-                    logger.error("Connection to database could not be restabilished. Now exiting...")
                     print "Connection could not be restabilished"
+                    logger.exception("Connection to database could not be restabilished. Now exiting...")
                     raise
                     sys.exit(0)  # Just in case raise doesn't raise
                 time.sleep(30)
@@ -389,5 +388,5 @@ while True:
 
     except:
         print "Unhandled Exception, non SerialError in main while loop"
-        logger.error("Unhandled Exception, non SerialError in main while loop")
+        logger.exception("Unhandled Exception, non SerialError in main while loop")
         raise
