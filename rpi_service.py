@@ -1,5 +1,4 @@
 #!/usr/bin/python2
-version = "0.8 Build 3"
 """
 Sensor Reader Script
 
@@ -7,6 +6,7 @@ Sensor Reader Script
 Attributes:
     sensors: List to hold the sensor objects.
     count: Variable to hold number of entries sent to DB.
+    version: Version number
 
 """
 from serial import termios
@@ -25,6 +25,8 @@ from serialsensor import *
 if (os.getuid() != 0):
     print "Must be run as superuser"
     sys.exit(0)
+
+version = "0.8 Build 5"
 
 sensors = []
 count = 0
@@ -308,16 +310,20 @@ while True:
         if e.errno == 0:  # Errno 0: Could not connect error, try to repair:
             print e
             logger.error(e)
-            for _ in xrange(3):
-                if i.check_connection(True):  # Try to repair connection
-                    print "Fixed"
-                    logger.info("Fixed")
-                    break
-            if not i.check_connection(True):  # If unable to repair, disable sensor, and move on
-                i.enable(False)
-                print "Disabled sensor: " + e.sensor + ' @ ' + e.port
-                logger.error(("Disabled sensor: " + e.sensor +
-                              ' @ ' + e.port + ' errno ' + str(e.errno)))
+            if i.check_connection(False):  # Try again
+                print "Fixed, no repair"
+                logger.info("Fixed, no repair")
+            else:
+                for _ in xrange(3):
+                    if i.check_connection(True):  # Try to repair connection
+                        print "Fixed, repaired"
+                        logger.info("Fixed, fixed repaired")
+                        break
+                if not i.check_connection(True):  # If unable to repair, disable sensor, and move on
+                    i.enable(False)
+                    print "Disabled sensor: " + e.sensor + ' @ ' + e.port
+                    logger.error(("Disabled sensor: " + e.sensor +
+                                  ' @ ' + e.port + ' errno ' + str(e.errno)))
         elif e.errno == 2:  # Errno 2: Invalid data type error, try reading again:
             print e
             logger.error(e)
@@ -334,7 +340,6 @@ while True:
                 i.send('R')
                 time.sleep((float(i.getWaitTime())/1000) + 1)
                 i.readRaw()
-                pass
             except SerialError, e:  # Still having problems, remove sensor
                 i.enable(False)
                 print "Disabled sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
