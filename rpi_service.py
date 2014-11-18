@@ -26,7 +26,7 @@ if (os.getuid() != 0):
     print "Must be run as superuser"
     sys.exit(0)
 
-version = "0.8 Build 5"
+version = "0.8 Build 6"
 
 sensors = []
 count = 0
@@ -373,8 +373,8 @@ while True:
             i += 1
 
     except termios.error, e:
-        print "Termios error occured: " + e.args + ' ' + e.message + 'on' + i.getName()
-        logger.error(("Termios error occured: " + e.args + ' ' + e.message))
+        print "Termios error occured: " + e.args[0] + ' ' + e.message + 'on' + i.getName()
+        logger.error(("Termios error occured: " + e.args[0] + ' ' + e.message))
         for _ in xrange(3):
             if i.check_connection(True):  # Try to repair connection
                 print "Fixed"
