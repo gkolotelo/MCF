@@ -26,7 +26,7 @@ if (os.getuid() != 0):
     print "Must be run as superuser"
     sys.exit(0)
 
-version = "0.8 Build 7"
+version = "0.8 Build 8"
 
 sensors = []
 count = 0
@@ -317,74 +317,75 @@ while True:
                 for _ in xrange(3):
                     if i.check_connection(True):  # Try to repair connection
                         print "Fixed, repaired"
-                        logger.info("Fixed, fixed repaired")
+                        logger.info("Fixed, repaired")
                         break
-                if not i.check_connection(True):  # If unable to repair, disable sensor, and move on
-                    i.enable(False)
-                    print "Disabled sensor: " + e.sensor + ' @ ' + e.port
-                    logger.error(("Disabled sensor: " + e.sensor +
+                if not i.check_connection(True):  # If unable to repair, reboot board
+                    print "Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port
+                    logger.error(("Rebooting board, due to fault in: " + e.sensor +
                                   ' @ ' + e.port + ' errno ' + str(e.errno)))
+                    os.system("systemctl reboot")
         elif e.errno == 2:  # Errno 2: Invalid data type error, try reading again:
             print e
             logger.error(e)
-            for _ in xrange(5):
+            for j in xrange(5):
                 try:
-                    time.sleep(2)
-                    i.send('R')
-                    time.sleep((float(i.getWaitTime())/1000) + 1)
-                    i.readRaw()
+                    i.read()
                     break
                 except SerialError, e:
                     pass
-            try:
-                i.send('R')
-                time.sleep((float(i.getWaitTime())/1000) + 1)
-                i.readRaw()
-            except SerialError, e:  # Still having problems, remove sensor
-                i.enable(False)
-                print "Disabled sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
-                logger.error(("Disabled sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)))
+            if j >= 4:
+                print "Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
+                logger.error(("Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)))
+                os.system("systemctl reboot")
         elif e.errno == 3:
             print e
             logger.error(e)
         else:
             print "SerialError occured, unhandled error on sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
             logger.exception("SerialError occured, unhandled error on sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno))
+            print "Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
+            logger.error(("Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)))
+            os.system("systemctl reboot")
             raise
 
     except pymongo.errors.AutoReconnect, e:
         logger.error("Connection to database @ " + settings["settings"]["server"] + " Lost, trying to reconnect every 30 seconds up to 500 times")
         print "Connection lost"
         timeout = 500
-        i = 0
-        while i <= timeout:
+        j = 0
+        while j <= timeout:
             try:
                 client.database_names()  # try to reconnect
                 logger.info("Connection restabilished. Continuing...")
                 print "Connection restabilished. Continuing..."
-                i = timeout
+                j = timeout
             except pymongo.errors.AutoReconnect, e:
-                if i == timeout:
+                if j == timeout:
                     print "Connection could not be restabilished"
                     logger.exception("Connection to database could not be restabilished. Now exiting...")
                     raise
                     sys.exit(0)  # Just in case raise doesn't raise
                 time.sleep(30)
-            i += 1
+            j += 1
 
     except termios.error, e:
         print "Termios error occured: " + str(e) + ' ' + e.message + 'on' + i.getName()
         logger.error(("Termios error occured: " + str(e) + ' ' + e.message))
-        for _ in xrange(3):
-            if i.check_connection(True):  # Try to repair connection
-                print "Fixed"
-                logger.info("Fixed")
-                break
-        if not i.check_connection(True):  # If unable, disable sensor, and move on
+        for j in xrange(5):
+            if i.check_connection(True):  # Connection's ok, try reading
+                try:
+                    i.read()
+                    print "Fixed"
+                    logger.info("Fixed")
+                    break
+                except:
+                    continue
+
+        if i >= 3:  # If unable, reboot board
             i.enable(False)
-            print "Disabled sensor: " + i.getName() + ' @ ' + i.getPort()
-            logger.error(("Disabled sensor: " + i.getName() + ' @ ' + i.getPort()))
-            pass
+            print "Rebooting board, due to termios error in: " + i.getName() + ' @ ' + i.getPort()
+            logger.error(("Rebooting board, due to termios error in: " + i.getName() + ' @ ' + i.getPort()))
+            os.system("systemctl reboot")
 
     except KeyboardInterrupt, e:
         print "Manual quit"
@@ -392,6 +393,6 @@ while True:
         sys.exit(0)
 
     except:
-        print "Unhandled Exception, non SerialError in main while loop"
-        logger.exception("Unhandled Exception, non SerialError in main while loop")
-        raise
+        print "Unhandled Exception, non SerialError in main while loop, rebooting..."
+        logger.exception("Unhandled Exception, non SerialError in main while loop, rebooting...")
+        os.system("systemctl reboot")
