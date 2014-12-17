@@ -250,7 +250,7 @@ except KeyboardInterrupt:  # Catch manual override
         logger.exception("Cannot open config file")
         raise
     del number, name, units, wait, fp
-# cleanup unused variable
+# cleanup unused variables
 del settings, syspaths, ports, available_ports, arg
 
 # Display sensors
@@ -310,9 +310,13 @@ while True:
         if e.errno == 0:  # Errno 0: Could not connect error, try to repair:
             print e
             logger.error(e)
-            if i.check_connection(False):  # Try again
-                print "Fixed, no repair"
-                logger.info("Fixed, no repair")
+            if i.check_connection():  # Check if connection is open, if so, try reading.
+                try:
+                    i.read()
+                    print "Fixed, no repair"
+                    logger.info("Fixed, no repair")
+                except:
+                    pass
             else:
                 for _ in xrange(3):
                     if i.check_connection(True):  # Try to repair connection
@@ -340,6 +344,9 @@ while True:
         elif e.errno == 3:
             print e
             logger.error(e)
+        elif e.errno == 6:
+            print e
+            logger.error(e)
         else:
             print "SerialError occured, unhandled error on sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
             logger.exception("SerialError occured, unhandled error on sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno))
@@ -349,7 +356,7 @@ while True:
             raise
 
     except pymongo.errors.AutoReconnect, e:
-        logger.error("Connection to database @ " + settings["settings"]["server"] + " Lost, trying to reconnect every 30 seconds up to 500 times")
+        logger.error("Connection to database Lost, trying to reconnect every 30 seconds up to 500 times")
         print "Connection lost"
         timeout = 500
         j = 0
@@ -372,17 +379,16 @@ while True:
         print "Termios error occured: " + str(e) + ' ' + e.message + 'on' + i.getName()
         logger.error(("Termios error occured: " + str(e) + ' ' + e.message))
         for j in xrange(5):
-            if i.check_connection(True):  # Connection's ok, try reading
-                try:
-                    i.read()
-                    print "Fixed"
-                    logger.info("Fixed")
-                    break
-                except:
-                    continue
-
-        if i >= 3:  # If unable, reboot board
-            i.enable(False)
+            try:
+                i.check_connection(True)
+                i.read()
+                print "Fixed"
+                logger.info("Fixed")
+                break
+            except:
+                continue
+        if j >= 4:  # If unable, reboot board
+            # i.enable(False)
             print "Rebooting board, due to termios error in: " + i.getName() + ' @ ' + i.getPort()
             logger.error(("Rebooting board, due to termios error in: " + i.getName() + ' @ ' + i.getPort()))
             os.system("systemctl reboot")
