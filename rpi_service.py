@@ -307,53 +307,34 @@ while True:
                   more than defined reading frequency. Make necessary adjustments."
 
     except SerialError, e:
-        if e.errno == 0:  # Errno 0: Could not connect error, try to repair:
-            print e
-            logger.error(e)
-            if i.check_connection():  # Check if connection is open, if so, try reading.
-                try:
-                    i.read()
-                    print "Fixed, no repair"
-                    logger.info("Fixed, no repair")
-                except:
-                    pass
-            else:
-                for _ in xrange(3):
-                    if i.check_connection(True):  # Try to repair connection
-                        print "Fixed, repaired"
-                        logger.info("Fixed, repaired")
-                        break
-                if not i.check_connection(True):  # If unable to repair, reboot board
-                    print "Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port
-                    logger.error(("Rebooting board, due to fault in: " + e.sensor +
-                                  ' @ ' + e.port + ' errno ' + str(e.errno)))
-                    os.system("systemctl reboot")
-        elif e.errno == 2:  # Errno 2: Invalid data type error, try reading again:
-            print e
-            logger.error(e)
+        print e
+        logger.error(e)
+        try:
+            i.read()
+            print "No problems found"
+        #    logger.info("Fixed, no problems found")
+        except SerialError, e:
             for j in xrange(5):
                 try:
+                    i.close()
+                    i.open()
                     i.read()
                     break
                 except SerialError, e:
                     pass
+                except:
+                    print "Unhandled Exception, non SerialError in SerialError exception, rebooting..."
+                    logger.exception("Unhandled Exception, non SerialError in SerialError exception, rebooting...")
+                    os.system("systemctl reboot")
             if j >= 4:
                 print "Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
                 logger.error(("Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)))
                 os.system("systemctl reboot")
-        elif e.errno == 3:
-            print e
-            logger.error(e)
-        elif e.errno == 6:
-            print e
-            logger.error(e)
-        else:
-            print "SerialError occured, unhandled error on sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
-            logger.exception("SerialError occured, unhandled error on sensor: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno))
-            print "Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
-            logger.error(("Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)))
+        except:
+            print "Unhandled Exception, non SerialError in SerialError exception, rebooting..."
+            logger.exception("Unhandled Exception, non SerialError in SerialError exception, rebooting...")
             os.system("systemctl reboot")
-            raise
+
 
     except pymongo.errors.AutoReconnect, e:
         logger.error("Connection to database Lost, trying to reconnect every 30 seconds up to 500 times")
@@ -375,23 +356,23 @@ while True:
                 time.sleep(30)
             j += 1
 
-    except termios.error, e:
-        print "Termios error occured: " + str(e) + ' ' + e.message + 'on' + i.getName()
-        logger.error(("Termios error occured: " + str(e) + ' ' + e.message))
-        for j in xrange(5):
-            try:
-                i.check_connection(True)
-                i.read()
-                print "Fixed"
-                logger.info("Fixed")
-                break
-            except:
-                continue
-        if j >= 4:  # If unable, reboot board
-            # i.enable(False)
-            print "Rebooting board, due to termios error in: " + i.getName() + ' @ ' + i.getPort()
-            logger.error(("Rebooting board, due to termios error in: " + i.getName() + ' @ ' + i.getPort()))
-            os.system("systemctl reboot")
+    # except termios.error, e:
+    #     print "Termios error occured: " + str(e) + ' ' + e.message + 'on' + i.getName()
+    #     logger.error(("Termios error occured: " + str(e) + ' ' + e.message))
+    #     for j in xrange(5):
+    #         try:
+    #             i.check_connection(True)
+    #             i.read()
+    #             print "Fixed"
+    #             logger.info("Fixed")
+    #             break
+    #         except:
+    #             continue
+    #     if j >= 4:  # If unable, reboot board
+    #         # i.enable(False)
+    #         print "Rebooting board, due to termios error in: " + i.getName() + ' @ ' + i.getPort()
+    #         logger.error(("Rebooting board, due to termios error in: " + i.getName() + ' @ ' + i.getPort()))
+    #         os.system("systemctl reboot")
 
     except KeyboardInterrupt, e:
         print "Manual quit"
