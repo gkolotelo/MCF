@@ -3,7 +3,7 @@ import serial
 import time
 from serial.tools.list_ports import comports
 
-# version = "0.8 Build 5"
+SerialSensor_version = "0.8 Build 6"
 
 CRLF = 0
 CR = 1
@@ -37,7 +37,7 @@ class SerialError(Exception):
                         '" @ "' + self.port + '" errno ' + str(self.errno) + " Method: " + function)
         else:
             return repr('SerialSensor Error: ' + self.args[0] + ' Sensor: "' + self.sensor + '" @ "' + self.port
-                        + '" errno ' + str(self.errno) + " Method: " + function + " message:" + self.msg)
+                        + '" errno ' + str(self.errno) + " Method: " + self.function + " message:" + self.msg)
 
 
 class SerialSensor:
