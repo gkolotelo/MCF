@@ -3,7 +3,7 @@ import serial
 import time
 from serial.tools.list_ports import comports
 
-# version = "0.8 Build 3"
+# version = "0.8 Build 5"
 
 CRLF = 0
 CR = 1
@@ -23,16 +23,21 @@ def listPorts():
 
 
 class SerialError(Exception):
-    def __init__(self, arg='Unknown SerialError', sensor='N/D', port='N/D', errno=None, msg=''):  # Changed errno=0
+    def __init__(self, arg='Unknown SerialError', sensor='N/D', port='N/D', errno=None, function="", msg=''):  # Changed errno=0
         self.args = (arg,)
         self.errno = errno
         self.port = port
         self.sensor = sensor
+        self.function = function
         self.msg = msg
 
     def __str__(self):
-        return repr('SerialSensor Error: ' + self.args[0] + ' Sensor: "' + self.sensor +
-                    '" @ "' + self.port + '" errno ' + str(self.errno) + self.msg)
+        if self.msg == '':
+            return repr('SerialSensor Error: ' + self.args[0] + ' Sensor: "' + self.sensor +
+                        '" @ "' + self.port + '" errno ' + str(self.errno) + " Method: " + function)
+        else:
+            return repr('SerialSensor Error: ' + self.args[0] + ' Sensor: "' + self.sensor + '" @ "' + self.port
+                        + '" errno ' + str(self.errno) + " Method: " + function + " message:" + self.msg)
 
 
 class SerialSensor:
@@ -70,10 +75,10 @@ class SerialSensor:
             self.__connection = Serial(serial_port, baud_rate, bytesize=bytesize, parity=parity,
                                        stopbits=stopbits, timeout=timeout, writeTimeout=writeTimeout)
             self.__connection.write('\r')  # Sometimes first commands are read as error, this prevents that
-        except serial.SerialException:
-            raise SerialError("Could not connect to serial device", self.__name, self.__serial_port, 0)
+        except serial.SerialException, e:
+            raise SerialError("Could not connect to serial device during initialization", self.__name, self.__serial_port, 0, 'SerialSensor()', e.message)
         except serial.SerialTimeoutException:
-            raise SerialError("Timeout on device", self.__name, self.__serial_port, 0)
+            raise SerialError("Timeout on device during initialization", self.__name, self.__serial_port, 0, 'SerialSensor()')
         time.sleep(0.3)  # Wait for receive buffer to fill
         self.__connection.flushInput()
         self.__connection.flushInput()
@@ -88,7 +93,12 @@ class SerialSensor:
             raise SerialError("Timeout on device", self.__name, self.__serial_port, 0)
 
     def send(self, command):
-        self.__connection.flushInput()
+        if not self.__connection.isOpen():
+            raise SerialError("Could not connect to serial device -> Connection closed.", self.__name, self.__serial_port, 0, 'readRaw()')
+        try:
+            self.__connection.flushInput()
+        except termios.error:
+            raise SerialError("Could not connect to serial device -> TERMIOS error.", self.__name, self.__serial_port, 0, 'send()', "flushInput() call")
         if command[-1:] == '\n':
             command = command[:-1]
         if not command[-1:] == '\r':
@@ -97,7 +107,11 @@ class SerialSensor:
         try:
             self.__connection.write(command)
         except serial.SerialTimeoutException:
-            raise SerialError("Timeout on device", self.__name, self.__serial_port, 0, "serialsensor.send()")
+            raise SerialError("Timeout on device", self.__name, self.__serial_port, 0, 'send()', "write() call")
+        except serial.SerialException, e:
+            raise SerialError("Could not connect to serial device -> SerialException.", self.__name, self.__serial_port, 0, 'send()', "write() call " + e.message)
+        except IOError:
+            raise SerialError("Could not connect to serial device -> IOError.", self.__name, self.__serial_port, 0, 'send()', "write() call")
 
     def readRaw(self):
         """readRaw() reads the serial buffer as ASCII characters up to a carriage return.
@@ -107,8 +121,14 @@ class SerialSensor:
             raise SerialError("Could not connect to serial device -> Connection closed.", self.__name, self.__serial_port, 0, 'readRaw()')
         try:
             buff = self.__connection.inWaiting()
-        except:
-            raise SerialError("Failed reading serial device.", self.__name, self.__serial_port, 0, 'readRaw()')
+        except serial.SerialException, e:
+            raise SerialError("Failed reading serial device -> SerialException.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call " + e.message)
+        except termios.error:
+            raise SerialError("Could not connect to serial device, TERMIOS error.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call")
+        except IOError:
+            raise SerialError("Could not connect to serial device, IOError.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call")
+        except Exception, e:
+            raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call, Error: " + e)
         if buff == 0:
             raise SerialError("No data read -> No data on receive buffer.", self.__name, self.__serial_port, 3, 'readRaw()')
         try:
@@ -116,17 +136,22 @@ class SerialSensor:
             char = ''
             while char != '\r' and char != '\n':
                 if self.__connection.inWaiting() == 0:
-                    raise SerialError("Did not receive EOL character, assuming corrupted data.", self.__name,
-                                      self.__serial_port, 6, ('Last character received: "' + char + '"' + 'readRaw()'))
+                    raise SerialError("Did not receive EOL character, assuming corrupted data.", self.__name, self.__serial_port, 6, 'readRaw()', 'Last character received: "' + char + '"')
                 time.sleep(0.01)
                 char = self.__connection.read(1)
                 time.sleep(0.01)
                 string += char
             self.__last_read_string = string
         except serial.SerialTimeoutException:
-            raise SerialError("Timeout on device", self.__name, self.__serial_port, 0, 'readRaw()')
-        except serial.SerialException:
-            raise SerialError("Failed reading serial device.", self.__name, self.__serial_port, 0, 'readRaw()')
+            raise SerialError("Timeout on device -> SerialTimeoutException", self.__name, self.__serial_port, 0, 'readRaw()')
+        except serial.SerialException, e:
+            raise SerialError("Failed reading serial device -> SerialException.", self.__name, self.__serial_port, 0, 'readRaw()', e.message)
+        except termios.error:
+            raise SerialError("Could not connect to serial device -> TERMIOS error.", self.__name, self.__serial_port, 0, 'readRaw()')
+        except IOError:
+            raise SerialError("Could not connect to serial device -> IOError.", self.__name, self.__serial_port, 0, 'readRaw()')
+        except Exception, e:
+            raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'readRaw()', "Error: " + e)
         return string
 
     def read_hex(self):
@@ -203,7 +228,7 @@ class SerialSensor:
         try:
             values = [float(i) for i in val_list]
         except ValueError:
-            raise SerialError("Invalid data type", self.__name, self.__serial_port, 2, ('Invalid string: "' + self.__last_read_string + '"'))
+            raise SerialError("Invalid data type received -> Cannot convert to float.", self.__name, self.__serial_port, 2, 'readValues()', 'Invalid string: "' + self.__last_read_string + '"')
         return values
 
     def readJSON(self):
@@ -224,6 +249,8 @@ class SerialSensor:
     def read(self):
         #self.close()  # Make sure it's closed, so no errors are thrown
         #self.open()
+        if self.read_command is None:
+            raise SerialError("Invalid Data Type -> No read_command set, nothing to send.", self.__name, self.__serial_port, 2, 'read()')
         self.send(self.read_command())
         time.sleep(self.getWaitTime()/1000)
         reading = self.readJSON()
@@ -236,12 +263,21 @@ class SerialSensor:
     def open(self):
         try:
             self.__connection.open()
-            time.sleep(0.05)
+            time.sleep(0.2)
+        except SerialException, e:
+            raise SerialError("Could not connect to serial device -> SerialException", self.__name, self.__serial_port, 0, 'open()', e.message)
+        except termios.error:
+            raise SerialError("Could not connect to serial device -> TERMIOS error.", self.__name, self.__serial_port, 0, 'open()')
+        except IOError:
+            raise SerialError("Could not connect to serial device -> IOError.", self.__name, self.__serial_port, 0, 'open()')
+        except Exception, e:
+            raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'open()', "Error: " + e)
         except:
-            raise SerialError("Could not connect to serial device", self.__name, self.__serial_port, 0)
+            raise SerialError("Unknown exception.", self.__name, self.__serial_port, 0, 'open()')
 
     def close(self):
         self.__connection.close()
+        time.sleep(0.2)
 
     def isEnabled(self):
         return self.__enabled
