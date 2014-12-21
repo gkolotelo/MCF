@@ -1,4 +1,4 @@
-from serial import Serial, termios
+from serial import Serial, termios, SerialException
 import serial
 import time
 from serial.tools.list_ports import comports
@@ -34,7 +34,7 @@ class SerialError(Exception):
     def __str__(self):
         if self.msg == '':
             return repr('SerialSensor Error: ' + self.args[0] + ' Sensor: "' + self.sensor +
-                        '" @ "' + self.port + '" errno ' + str(self.errno) + " Method: " + function)
+                        '" @ "' + self.port + '" errno ' + str(self.errno) + " Method: " + self.function)
         else:
             return repr('SerialSensor Error: ' + self.args[0] + ' Sensor: "' + self.sensor + '" @ "' + self.port
                         + '" errno ' + str(self.errno) + " Method: " + self.function + " message:" + self.msg)
@@ -99,9 +99,7 @@ class SerialSensor:
             self.__connection.flushInput()
         except termios.error:
             raise SerialError("Could not connect to serial device -> TERMIOS error.", self.__name, self.__serial_port, 0, 'send()', "flushInput() call")
-        if command[-1:] == '\n':
-            command = command[:-1]
-        if not command[-1:] == '\r':
+        if command[-1:] != '\n' or command[-1:] != '\r':  # If line ending not defined, default to CR
             command += '\r'
         time.sleep(0.1)
         try:
