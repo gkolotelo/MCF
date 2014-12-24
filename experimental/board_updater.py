@@ -5,8 +5,8 @@ import sys
 import paramiko
 
 # Boards:
-boards = ['water_sensors_4.media.mit.edu']
-          #'water_sensors_2.media.mit.edu',
+boards = ['water_sensors_3.media.mit.edu']
+          #,'water_sensors_2.media.mit.edu',
           #'water_sensors_3.media.mit.edu',
           #'water_sensors_4.media.mit.edu',
           #'water_sensors_5.media.mit.edu',
@@ -35,7 +35,13 @@ username = "root"
 password = "plantos"
 # username = raw_input("Enter username: ")
 # password = raw_input("Enter password: ")
-foldername = "RPi_" + raw_input("Enter foldername or leave blank for default: RPi_")
+foldername = raw_input("Enter foldername or leave blank for default: RPi_")
+now = datetime.datetime.now()
+if foldername == "":
+    foldername = "RPi_" + str(now.month) + '_' + str(now.day) + '_' + str(now.year) +\
+                 '_' + str(now.hour) + '_' + str(now.minute) + '_' + str(now.second)
+else:
+    foldername = "RPi_" + foldername
 
 print "\nProceeding with updates...\n\n\n"
 
@@ -46,10 +52,6 @@ for board in boards:
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     client.connect(board, username=username, password=password)
     print "Connected"
-    now = datetime.datetime.now()
-    if foldername != "":
-        foldername = "RPi_" + str(now.month) + '_' + str(now.day) + '_' + str(now.year) +\
-                     '_' + str(now.hour) + '_' + str(now.minute) + '_' + str(now.second)
     print "Creating backup of current files on new folder: " + foldername
     _, stdout, stderr = client.exec_command('cp -r RPi/ ' + foldername)
     if len(stderr.readlines()) != 0:

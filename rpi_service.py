@@ -26,7 +26,7 @@ if (os.getuid() != 0):
     print "Must be run as superuser"
     sys.exit(0)
 
-version = "0.8 Build 8"
+version = "0.8 Build 11"
 
 sensors = []
 count = 0
@@ -42,7 +42,7 @@ handler.setLevel(logging.INFO)
 formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
 handler.setFormatter(formatter)
 logger.addHandler(handler)
-logger.info("\n\n\nStarted excecution:\n")
+logger.info("\n\n\nStarted execution:\n")
 
 
 def now():
@@ -50,12 +50,12 @@ def now():
     return(datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds()
 
 
-def unhandled_exception_logger(type, value, traceback):
+def unhandled_exception_logger(_type, value, traceback):
     # Logs unhandled exceptions
-    logger.error("Uncaught unhandled exception")
-    logger.error(type)
+    logger.exception("Uncaught unhandled exception")
+    logger.error(_type)
     logger.error(value)
-    logger.error(traceback)
+    logger.error(traceback.print_exception(_type, value, traceback))
     print "Check errors in log"
     sys.exit()
 
@@ -309,10 +309,11 @@ while True:
     except SerialError, e:
         print e
         logger.error(e)
+        if e.errno != 3: logger.exception("The previous error was due to the following exception:")
         try:
             i.read()
             print "No problems found"
-        #    logger.info("Fixed, no problems found")
+            logger.info("No problems found")
         except SerialError, e:
             for j in xrange(5):
                 try:
@@ -321,7 +322,7 @@ while True:
                     i.read()
                     break
                 except SerialError, e:
-                    pass
+                    logger.exception("Exception occured during #" + str(j) + " trial.")
                 except:
                     print "Unhandled Exception, non SerialError in SerialError exception, rebooting..."
                     logger.exception("Unhandled Exception, non SerialError in SerialError exception, rebooting...")
@@ -334,7 +335,6 @@ while True:
             print "Unhandled Exception, non SerialError in SerialError exception, rebooting..."
             logger.exception("Unhandled Exception, non SerialError in SerialError exception, rebooting...")
             os.system("systemctl reboot")
-
 
     except pymongo.errors.AutoReconnect, e:
         logger.error("Connection to database Lost, trying to reconnect every 30 seconds up to 500 times")

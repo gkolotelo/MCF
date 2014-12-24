@@ -112,8 +112,10 @@ class SerialSensor:
             raise SerialError("Could not connect to serial device -> IOError.", self.__name, self.__serial_port, 0, 'send()', "write() call")
 
     def readRaw(self):
-        """readRaw() reads the serial buffer as ASCII characters up to a carriage return.
-        If no character are read, a SerialError (Error #3) is raised.
+        """readRaw() reads the serial buffer as ASCII characters up to a Carriage Return or Line Feed.
+        If no characters are read, a SerialError (Error #3) is raised. If no EOL character
+        is received, a SerialError (Error #6) is raised.
+        String returned ends with CR or LF, but never CRLF.
         """
         if not self.__connection.isOpen():
             raise SerialError("Could not connect to serial device -> Connection closed.", self.__name, self.__serial_port, 0, 'readRaw()')
@@ -126,7 +128,7 @@ class SerialSensor:
         except IOError:
             raise SerialError("Could not connect to serial device, IOError.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call")
         except Exception, e:
-            raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call, Error: " + e)
+            raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call, Error: " + str(e))
         if buff == 0:
             raise SerialError("No data read -> No data on receive buffer.", self.__name, self.__serial_port, 3, 'readRaw()')
         try:
@@ -149,7 +151,7 @@ class SerialSensor:
         except IOError:
             raise SerialError("Could not connect to serial device -> IOError.", self.__name, self.__serial_port, 0, 'readRaw()')
         except Exception, e:
-            raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'readRaw()', "Error: " + e)
+            raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'readRaw()', "Error: " + str(e))
         return string
 
     def read_hex(self):
@@ -269,7 +271,7 @@ class SerialSensor:
         except IOError:
             raise SerialError("Could not connect to serial device -> IOError.", self.__name, self.__serial_port, 0, 'open()')
         except Exception, e:
-            raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'open()', "Error: " + e)
+            raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'open()', "Error: " + str(e))
         except:
             raise SerialError("Unknown exception.", self.__name, self.__serial_port, 0, 'open()')
 

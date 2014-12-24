@@ -123,34 +123,34 @@ logger.info(board_info)
 del board_info
 
 #Find and match serial ports:
-available_ports = listPorts()
-if len(available_ports) == 0:
-    logger.error("No ports found.")
-    sys.exit(0)
-ports = []
-syspaths = []
-for i in available_ports:
-    ports.append(i[0])#get only ttyUSBX values
-    arg = 'udevadm info -q path -n ' + i[0]
-    arg = subprocess.check_output(arg, shell=True)
-    arg = '/sys' + arg[0:arg.index('tty')]
-    syspaths.append(arg)#get sysfs bus info
+    available_ports = listPorts()
+    if len(available_ports) == 0:
+        logger.error("No ports found.")
+        sys.exit(0)
+    ports = []
+    syspaths = []
+    for i in available_ports:
+        ports.append(i[0])#get only ttyUSBX values
+        arg = 'udevadm info -q path -n ' + i[0]
+        arg = subprocess.check_output(arg, shell=True)
+        arg = '/sys' + arg[0:arg.index('tty')]
+        syspaths.append(arg)#get sysfs bus info
 
-for i in settings["sensors"]:
-    if not i["path"] in syspaths:#If path stored in the settings file does not exist in syspaths throw error
-        logger.error("Not all sensors are connected, check connections and try again, or manually enter sensors. Now exiting.")
-        sys.exit(0) 
-for i in settings["sensors"]:#Instantiate sensors defined in settings file
-    arg = 'ls ' + i["path"] + ' |grep tty'
-    port = '/dev/' + subprocess.check_output(arg, shell=True)[0:-1]#Remove \n, and add /dev/
-    if(port == '/dev/tty'):#Ubuntu exception
-        arg = 'ls ' + i["path"] + '/tty |grep tty'
-        port = '/dev/' + subprocess.check_output(arg, shell=True)[0:-1]
-    try:
-        sensors.append(SerialSensor(i["name"], i["units"], port, i["wait_time"], i["baud_rate"]))#initialize sensors
-    except SerialError, e:
-        logger.error(e.args + e.sensor + e.port)
-        raise
+    for i in settings["sensors"]:
+        if not i["path"] in syspaths:#If path stored in the settings file does not exist in syspaths throw error
+            logger.error("Not all sensors are connected, check connections and try again, or manually enter sensors. Now exiting.")
+            sys.exit(0) 
+    for i in settings["sensors"]:#Instantiate sensors defined in settings file
+        arg = 'ls ' + i["path"] + ' |grep tty'
+        port = '/dev/' + subprocess.check_output(arg, shell=True)[0:-1]#Remove \n, and add /dev/
+        if(port == '/dev/tty'):#Ubuntu exception
+            arg = 'ls ' + i["path"] + '/tty |grep tty'
+            port = '/dev/' + subprocess.check_output(arg, shell=True)[0:-1]
+        try:
+            sensors.append(SerialSensor(i["name"], i["units"], port, i["wait_time"], i["baud_rate"]))#initialize sensors
+        except SerialError, e:
+            logger.error(e.args + e.sensor + e.port)
+            raise
 
 #cleanup unused variables
 del port, i, settings, syspaths, ports, available_ports, arg
