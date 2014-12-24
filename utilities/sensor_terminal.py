@@ -45,7 +45,7 @@ while True:
     if (number == ''):
         print "Continuing..."
         break
-    sensors.append(SerialSensor("", "", available_ports[int(number)][0], 0))#initialize sensors
+    sensors.append(SerialSensor("", "", available_ports[int(number)][0], 0, 9600))#initialize sensors
 
 while True:
     print "Type sensor number, and press enter to enter commands to that sensor. When done press ctrl-c to be done with that sensor"
@@ -60,13 +60,13 @@ while True:
             while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
                 line = sys.stdin.readline()
                 if line:
-                    time.sleep(0.01)
                     sensors[int(sensor)].send(line)
-            time.sleep(0.1)
-            read = sensors[int(sensor)].readRaw()
+            try:
+                print sensors[int(sensor)].readRaw()
+            except SerialError, e:
+                if e.errno != 3:
+                    raise
 
-            if read != "":
-                print read
     except KeyboardInterrupt:
         pass
 

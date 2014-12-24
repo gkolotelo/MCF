@@ -5,12 +5,7 @@ import sys
 import paramiko
 
 # Boards:
-boards = ['water_sensors_2.media.mit.edu']
-          #,'water_sensors_2.media.mit.edu',
-          #'water_sensors_3.media.mit.edu',
-          #'water_sensors_4.media.mit.edu',
-          #'water_sensors_5.media.mit.edu',
-          #'water_sensors_6.media.mit.edu']
+boards = []  # <-- Add board addresses here
 
 try:
     filename = str(sys.argv[1])
@@ -31,10 +26,8 @@ res = raw_input("If the information above is correct, press enter to continue...
 if res != "":
     sys.exit(0)
 
-username = "root"
-password = "plantos"
-# username = raw_input("Enter username: ")
-# password = raw_input("Enter password: ")
+username = raw_input("Enter username: ")
+password = raw_input("Enter password: ")
 foldername = raw_input("Enter foldername or leave blank for default: RPi_")
 now = datetime.datetime.now()
 if foldername == "":
