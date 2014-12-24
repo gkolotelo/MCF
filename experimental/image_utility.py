@@ -32,17 +32,17 @@ Instructions:
 
             ==> (No SD card):
             user$: ls /dev
-            bus         loop1       sda2         stdout
-            cdrom       pts         sda5         tty0
-            cdrw        ram0        sdb          ttyUSB0
-            dvd         sda         stderr
-            dvdrw       sda1        stdin
+            bus         loop1       sda2         tty0
+            cdrom       pts         sda5         ttyUSB0
+            cdrw        ram0        stderr
+            dvd         sda         stdin
+            dvdrw       sda1        stdout
             ==> (Insert SD card)
             user$: ls /dev
             bus         loop1       sda2         stderr
             cdrom       pts         sda5         stdin
             cdrw        ram0        sdb          stdout
-            dvd         sda         sdb1  <--    tty0       Note that sdb1 and sdb2 appeared
+            dvd         sda         sdb1  <--    tty0       Note that sdb and sdb1 & 2 appeared
             dvdrw       sda1        sdb2  <--    ttyUSB0    after inserting the SD card.
 
         So the path you're interested in is: /dev/sdb
@@ -214,7 +214,8 @@ subprocess.check_output("rmdir " + mount_point, shell=True)
 if raw_input("Image preparation finished, press Enter to continue...") != '':
     print "Aborting"
     sys.exit(0)
-
+print "Unmounting disk"
+subprocess.check_output("eject " + target_disk, shell=True)
 print "\nBurning image to SD Card at " + target_disk
 print "Image burning may take as long as 15 minutes, please wait.\n\n"
 
