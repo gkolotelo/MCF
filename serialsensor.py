@@ -42,20 +42,35 @@ class SerialError(Exception):
 
 class SerialSensor:
     def __init__(self, name, units, serial_port, wait_time,
-                 baud_rate=38400, read_command=None, bytesize=8,
-                 parity='N', stopbits=1, timeout=5, writeTimeout=5):
-        """ Instatiates a sensor
+                 baud_rate=9600,
+                 read_command=None,
+                 bytesize=8,
+                 parity='N',
+                 stopbits=1,
+                 timeout=5,
+                 writeTimeout=5
+                 ):
+        """
+        Instatiates a sensor.
+
+        Notes:
+            The default baudrate is 9600bps
 
         Required Arguments:
-        name -- Name of the sensor/measurements (e.g. 'Temperature,Humidity').
-        units -- Units of the sensor/measurements (e.g. 'C,RH').
-        serial_port -- Serial port of the sensor (e.g. /dev/ttyUSBX).
-        wait_time -- Time to wait for response (in milliseconds).
-        read_command -- Function returning one string to be sent to sensor, if\
-        none defined read() method cannot be used. (e.g. lambda: 'R').
+            name (str): Name of the sensor/measurements (e.g. 'Temperature,Humidity').
+            units (str): Units of the sensor/measurements (e.g. 'C,RH').
+            serial_port (str): Serial port of the sensor (e.g. /dev/ttyUSBx).
+            wait_time (int): Time to wait for response (in milliseconds).
+            read_command (object or str): Function returning one string to be sent to sensor, if\
+            none defined read() method cannot be used. (e.g. lambda: 'R', or 'R').
 
         Optional Arguments:
-        baud_rate -- Baud rate of sensor (default 38400).
+            baud_rate (int): Baud rate of sensor (Default 9600).
+            bytesize (int): Default 8
+            parity (str): Default 'N'
+            stopbits (int): Default 1
+            timeout (int): Default 5 seconds
+            writeTimeout (int): Default 5 seconds
         """
         self.__serial_port = serial_port
         self.__baud_rate = baud_rate
@@ -247,14 +262,17 @@ class SerialSensor:
         return json_dict
 
     def read(self):
-        #self.close()  # Make sure it's closed, so no errors are thrown
-        #self.open()
+        # self.close()  # Make sure it's closed, so no errors are thrown
+        # self.open()
         if self.read_command is None:
             raise SerialError("Invalid Data Type -> No read_command set, nothing to send.", self.__name, self.__serial_port, 2, 'read()')
-        self.send(self.read_command())
+        if callable(self.read_command):
+            self.send(self.read_command())
+        else:
+            self.send(self.read_command)
         time.sleep(self.getWaitTime()/1000)
         reading = self.readJSON()
-        #self.close()
+        # self.close()
         return reading
 
     def getName(self):
