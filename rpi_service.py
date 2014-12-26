@@ -1,48 +1,102 @@
 #!/usr/bin/python2
 """
-Sensor Reader Script
+Sensor Reader Script 1.1 Build 2
+
+Script to retrieve data from serial sensors and storing onto MongoDB databases.
+Support for web management, and headless deployment.
+
+Script also used to demonstrate SerialSensor Library.
 
 
 Attributes:
-    sensors: List to hold the sensor objects.
-    count: Variable to hold number of entries sent to DB.
-    version: Version number
+    version (str): Version number.
+    counter (int): Variable to hold number of entries sent to DB.
+    hostname (str): Board's hostname.
+    ip_address (str): Board's IP Address.
+    base_path (str): Current working directory (where log and config files are located)
+    log_path (str): Path to the log file, appended to old_log_path, then cleared.
+    old_log_path (str): Path to the old log file, where current logs are appended to.
+    config_path (str): Path to the config file.
+    client (MongoClient): DB Client object.
 
 """
+
 from serial import termios
 import datetime
 import socket
-import json
+from bson import json_util
+from bson.objectid import ObjectId
 import sys
 import time
 import urllib2
 import subprocess
 import pymongo
+from pymongo import errors
 import logging
 import os
 from serialsensor import *
 
+
+# Global Variables:
+# Version number
+version = "1.1 Build 2"
+# Variable to count the number of data points sent
+counter = 0
+# Board's hostname
+hostname = socket.gethostname()
+ip_address = socket.gethostbyname(hostname)
+# base_path is the script directory, where log.log and config.json must be present
+base_path = os.path.dirname(os.path.realpath(__file__)) + '/'
+log_path = base_path + 'log.log'
+old_log_path = base_path + 'old_log.log'
+config_path = base_path + 'config.json'
+# DB Client
+client = None
+
+
+# Initializes logger
+def initialize_logger(log_path, old_log_path):
+    # Try to find current log, if found, append to old_log
+    try:
+        with open(log_path, 'r+') as curr_log:
+            with open(old_log_path, 'a+') as old_log:
+                old_log.writelines(curr_log.read())
+            curr_log.truncate(0)
+    except:
+        pass
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    handler = logging.FileHandler(log_path)
+    handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger
+
+
+# Initialize logger
+logger = initialize_logger(log_path, old_log_path)
+
+# Check if superuser
 if (os.getuid() != 0):
-    print "Must be run as superuser"
+    logger.error("Must be run as superuser!")
     sys.exit(0)
 
-version = "0.8 Build 11"
 
-sensors = []
-count = 0
-base_path = '/root/RPi/'
-log_path = base_path + 'log.log'
-config_path = base_path + 'config.json'
-sensor_reading_frequency = 0
+# Override sys.excepthook to log unhandled exceptions (unhandled_exception_logger defined at the end)
+def unhandled_exception_logger(_type, _value, _traceback):
+    # Logs unhandled exceptions
+    try:
+        uploadLog(client, log_path, settings['_id'])
+    except:
+        output("Error uploading log", logger.error)
+    logger.error("Uncaught unhandled exception: ", exc_info=(_type, _value, _traceback))
+    print "Check errors in log"
+    sys.exit()
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
-handler = logging.FileHandler(log_path)
-handler.setLevel(logging.INFO)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(lineno)d - %(message)s')
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-logger.info("\n\n\nStarted execution:\n")
+sys.excepthook = unhandled_exception_logger
+
+# Function definitions:
 
 
 def now():
@@ -50,336 +104,659 @@ def now():
     return(datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds()
 
 
-def unhandled_exception_logger(_type, value, traceback):
-    # Logs unhandled exceptions
-    logger.exception("Uncaught unhandled exception")
-    logger.error(_type)
-    logger.error(value)
-    logger.error(traceback.print_exception(_type, value, traceback))
-    print "Check errors in log"
-    sys.exit()
+# Check existence of settings on file and server, if not create and upload to server
+def initialize(path, hostname, version):
+    """
+    Initialization routine.
+    Initializes DB Client, and retrieves settings from DB and File for comparison.
+    If no settings are found on DB, file settings are pushed to DB, else, settings are pulled from DB
+    and saved to file.
 
-sys.excepthook = unhandled_exception_logger  # Override sys.excepthook
+    Notes:
+        - File config is essentially used to push settings/sensor settings pattern to DB, and insert
+        already initialized settings to a new DB.
+        - The 'client' returned is a global variable (used to upload logs if outside main()).
+        - Exits script if cannot retrieve settings from DB after just inserting them.
 
-# Initialization
-print version
-logger.info(version)
+    Args:
+        path (str): Path to config file.
+        hostname (str): Board's hostname.
+        version (str): Board's version string (defined in the beginning)
 
-# Waits for internet connection.
-try:
-    print "Waiting up to 30 seconds for internet connection, press ctrl-c to skip."
-    urllib2.urlopen('http://www.google.com', timeout=5)
-    logger.info("Internet connection estabilished")
-except urllib2.URLError:
-    t = time.time()
+    Returns:
+        (settings, client) tuple. With the settings file to be used, and the DB client
+    """
+    file_settings = getSettingsFromFile(path)  # Get username, password and server
+    client = mongoConnect(file_settings['settings']['value']['server']['value'],
+                          username=file_settings['settings']['value']['username']['value'],
+                          password=file_settings['settings']['value']['password']['value']
+                          )
     try:
-        while (time.time() - t) < 30:
-            try:
-                urllib2.urlopen('http://www.google.com', timeout=5)
-                break
-            except urllib2.URLError:
-                time.sleep(1)
-    finally:
-        del t
-except KeyboardInterrupt:
-    pass
-
-# Get settings from config file, if nonexistent, create one
-# Available settings:
-# settings["settings"]["board_name", "db_name", "server", "sensor_reading_frequency"]
-# settings["sensor"]["baud_rate", "wait_time", "name", "units", "port_number", "port", "path"]
-try:
-    settings = json.load(open(config_path))
-    logger.info("Config file found")
-except IOError, e:
-    if e.errno == 2:
-        if not raw_input("File not found, or nonexistent, press enter to create a new settings file (Enter)") == "": raise
+        Id = file_settings['_id']
+    except KeyError:
+        Id = None  # Using None as Id, No ID found on config file
+    settings = getSettingsFromDB(client, Id)
+    if settings is None or settings['changes']['date'] == "":
+        # No settings on server, or never saved, so
+        # board is new, or server is new, either way, push settings on file to DB
         try:
-            fp = open(config_path, 'w+')
-            settings = json.load(fp)
-            settings["settings"]["board_name"] = raw_input("Enter board name: ")
-            settings["settings"]["db_name"] = raw_input("Enter database name: ")
-            settings["settings"]["server"] = raw_input("Enter server address or IP: ")
-            settings["settings"]["sensor_reading_frequency"] = raw_input("Enter sensor reading frequency (seconds): ")
-            settings["sensor"] = {}
-            fp.write(json.dumps(settings, indent=4))
-            fp.close()
-            print "Done!"
-            logger.info("Config file created")
-        except IOError, e:
-            print "Could not create file"
-            logger.exception("Config file not found")
-            raise
-    else:
-        logger.exception("Config file not accessible, unhandled exception")
-        raise
-sensor_reading_frequency = float(settings["settings"]["sensor_reading_frequency"])
+            file_settings.pop('_id')  # Remove _id, in case settings_file already has one
+        except KeyError:
+            pass
+        if file_settings['changes']['date'] == "":
+            # No 'date' -> Uninitialized board, wait for settings to be updated
+            output("Server and Board uninitialized, adding initial info...")
+            file_settings['version']['value'] = version
+            file_settings['status']['value'] = "Uninitialized, waiting for update..."
+            file_settings['settings']['value']['hostname']['value'] = hostname
+            file_settings['ip']['value'] = ip_address
+            Id = saveSettingsToDB(file_settings, client, None)  # Creates new entry and gets _id
+            db_settings = getSettingsFromDB(client, Id)
+            if db_settings is None:
+                output("Problem Saving/Retrieving settings during initialization.", logger.error)
+                sys.exit(0)
+            saveSettingsToFile(db_settings, config_path)
+            output("Waiting for settings to be updated on the website, execution will resume once settings are updated...")
+            new_settings = checkUpdates(db_settings, client, Id, config_path)
+            while new_settings is None:
+                time.sleep(10)
+                new_settings = checkUpdates(db_settings, client, Id, config_path)
+            settings = new_settings
+            settings['status']['value'] = "Initialized"
+            saveSettingsToDB(settings, client, settings['_id'])
+            saveSettingsToFile(settings, path)
 
-printout = "Using settings:\n\n" + \
-           "Board Name: " + settings["settings"]["board_name"] + \
-           "\nMongo Server: " + settings["settings"]["server"] + \
-           "\nDB name: " + settings["settings"]["db_name"] + \
-           '\nFrequency (seconds): ' + str(settings["settings"]["sensor_reading_frequency"]) + \
-           "\nIP Address: " + socket.gethostbyname(socket.gethostname()) + \
-           "\nHostname: " + socket.gethostname() + "\n"
-print printout
-logger.info(printout)
-del printout
-
-# Connect to Mongo Server:
-print "Connecting to Mongo server..."
-try:
-    client = pymongo.MongoClient(settings["settings"]["server"])
-    client.admin.authenticate(settings["settings"]["username"], settings["settings"]["password"])
-    db = client[settings["settings"]["db_name"]]
-    collection = db[settings["settings"]["board_name"]]
-    print "Connected to ", collection.full_name
-    logger.info(("Connected to " + collection.full_name))
-except pymongo.errors.ConnectionFailure:
-    printout = 'Could not connect to Mongo at: "' + settings["settings"]["server"] + '" on database "' + \
-               settings["settings"]["db_name"] + "." + settings["settings"]["board_name"] + '"'
-    print printout
-    logger.error(printout)
-    sys.exit(0)
-
-# Register board on server, if already registered, update information about board
-board_info = {"ip": socket.gethostbyname(socket.gethostname()), "hostname": socket.gethostname(),
-              "sensor_reading_frequency": settings["settings"]["sensor_reading_frequency"],
-              "server": settings["settings"]["server"], "board_name": settings["settings"]["board_name"],
-              "db_name": settings["settings"]["db_name"]}
-try:
-    client["admin"]["boards"].update({"board_name": settings["settings"]["board_name"],
-                                      "db_name": settings["settings"]["db_name"]}, board_info)
-except:
-    client["admin"]["boards"].insert(board_info)
-print "Added board info to server:"
-print board_info
-logger.info("Added board info to server:")
-logger.info(board_info)
-del board_info
-
-# Find and match serial ports:
-print "\nListing available serial ports... (This may take a few seconds)"
-logger.info("Listing available serial ports")
-available_ports = listPorts()
-if len(available_ports) == 0:
-    print "Error: No ports found."
-    logger.error("No ports found.")
-    sys.exit(0)
-ports = []
-syspaths = []
-for i in available_ports:
-    ports.append(i[0])  # get only ttyUSBX values
-    arg = 'udevadm info -q path -n ' + i[0]
-    arg = subprocess.check_output(arg, shell=True)
-    arg = '/sys' + arg[0:arg.index('tty')]
-    syspaths.append(arg)  # get sysfs bus info
-
-print "Wait to use predefined sensors, press ctrl-c to manually enter sensors (will delete old sensors)."
-try:
-    for i in xrange(1, 6):  # timer waiting for user input
-        print (6-i)
-        time.sleep(1)
-        sys.stdout.write('\r')
-    print "Using sensors on config file..."
-    logger.info("Using sensors on config file")
-
-    for i in settings["sensors"]:
-        if not i["path"] in syspaths:
-            # If path stored in the settings file does not exist in syspaths throw error
-            print "Not all sensors are connected, check connections and try again,\
-                  or manually enter sensors. Now exiting."
-            logger.error("Not all sensors are connected, check connections and try \
-                         again, or manually enter sensors. Now exiting.")
-            sys.exit(0)
-    for i in settings["sensors"]:  # Instantiate sensors defined in settings file
-        arg = 'ls ' + i["path"] + ' |grep tty'
-        port = '/dev/' + subprocess.check_output(arg, shell=True)[0:-1]  # Remove \n, and add /dev/
-        if(port == '/dev/tty'):  # Ubuntu exception
-            arg = 'ls ' + i["path"] + '/tty |grep tty'
-            port = '/dev/' + subprocess.check_output(arg, shell=True)[0:-1]
-        try:
-            # initialize sensors:
-            sensors.append(SerialSensor(i["name"], i["units"], port, i["wait_time"], i["baud_rate"], read_command=lambda: 'R'))
-        except SerialError, e:
-            print e.args, e.sensor, e.port
-            raise
-    del port, i
-
-except KeyboardInterrupt:  # Catch manual override
-    print '\nAvailable serial ports:'
-    for i in ports:
-        print "({})".format(ports.index(i)), i
-
-    # Input example:
-    print "Several sensors can be entered, just enter the asked information\
-          (4 per sensor) for each sensor. When done, just press enter"
-    print "More than one measurement can be made by each sensor, just enter comma\
-          separated names for measurements and units (without spaces)"
-    print "Example: \n", "0 \nMeas_1,Meas_2", "\nmg/L,PPM", "\n1000", "\n[Enter]"
-
-    i = 1
-    while True:
-        print "\nSensor #" + str(i)
-        number = raw_input("Type a port number:")
-        if (number == ''):
-            print "Continuing..."
-            break
-        name = raw_input("Type the sensor's measurement name:")
-        units = raw_input("Type the sensor's units:")
-        wait = raw_input("Type the time this sensor takes to return a measurement (in milliseconds):")
-        # initialize sensors:
-        sensors.append(SerialSensor(name, units, available_ports[int(number)][0], int(wait), baud_rate=38400, read_command=lambda: 'R'))
-        i = i+1
-    # Store settings in file
-    settings["sensors"] = []
-    for i in sensors:
-        try:
-            settings["sensors"].append(i.getJSONSettings('path', syspaths[ports.index(i.getPort())]))
-            # Sysfs bus info added to JSON string
-        except SerialError, e:
-            print e.args, e.sensor, e.port
-            raise
-    try:
-        fp = open(config_path, 'w+')
-        fp.write(json.dumps(settings, indent=4))
-        fp.close()
-        logger.info("Added sensor to config file")
-    except IOError:
-        print "Cannot open settings file."
-        logger.exception("Cannot open config file")
-        raise
-    del number, name, units, wait, fp
-# cleanup unused variables
-del settings, syspaths, ports, available_ports, arg
-
-# Display sensors
-print "\nAvailable sensors:"
-logger.info("Available sensors:")
-for i in sensors:
-    print i.getName(), '@', i.getPort(), "units:", i.getUnits(), "waiting time:", i.getWaitTime()
-    logger.info((i.getName(), '@', i.getPort(), "units:", i.getUnits(), "waiting time:", i.getWaitTime()))
-print "Data points to date: ", collection.count()
-logger.info(("Data points to date: " + str(collection.count())))
-print "\nReading Started:\n\n"
-logger.info("Reading Started")
-
-# Send LED on and Disable continuous mode commands
-# try:
-#     for i in sensors:
-#         i.send('L1')
-#         i.send('E')
-# except:
-#     print e.args, e.sensor, e.port
-#     logger.error("Unhandled Exception")
-#     raise
-
-# End of initialization
-# Finally, start reading:
-# Main Loop
-while True:
-    try:
-        initial_time = time.time()
-        JSON_readings = {}  # clear dictionary for nex reading
-        for i in sensors:
-            if i.isEnabled():
-                # i.send('R')  # Can throw exceptions
-                # time.sleep((float(i.getWaitTime())/1000))
-                # reading = i.readJSON()  # Can throw exceptions
-                reading = i.read()  # New
-                JSON_readings.update(reading)
-        if JSON_readings == {} and count > 2:
-            print "No data being sent, exiting."
-            logger.error("No data being sent, exiting.")
-            sys.exit(0)
-        count += 1
-        JSON_readings["date"] = now()
-        collection.insert(JSON_readings)
-        print count
-        print JSON_readings
-        print '\n'
-        final_time = time.time()
-        sleep = (sensor_reading_frequency - (final_time - initial_time))
-        if sleep >= 0.0:
-            time.sleep(sleep)
         else:
-            print "Running at " + str(final_time - initial_time) + " seconds per reading, \
-                  more than defined reading frequency. Make necessary adjustments."
+            output("Board has already been initialized, however server has not, saving settings on file to server...")
+            Id = saveSettingsToDB(file_settings, client, None)
+            settings = getSettingsFromDB(client, Id)  # get new _id
+            saveSettingsToFile(settings, config_path)
 
-    except SerialError, e:
-        print e
-        logger.error(e)
-        if e.errno != 3: logger.exception("The previous error was due to the following exception:")
-        try:
-            i.read()
-            print "No problems found"
-            logger.info("No problems found")
-        except SerialError, e:
-            for j in xrange(5):
-                try:
-                    i.close()
-                    i.open()
-                    i.read()
-                    break
-                except SerialError, e:
-                    logger.exception("Exception occured during #" + str(j) + " trial.")
-                except:
-                    print "Unhandled Exception, non SerialError in SerialError exception, rebooting..."
-                    logger.exception("Unhandled Exception, non SerialError in SerialError exception, rebooting...")
-                    os.system("systemctl reboot")
-            if j >= 4:
-                print "Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)
-                logger.error(("Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno)))
-                os.system("systemctl reboot")
-        except:
-            print "Unhandled Exception, non SerialError in SerialError exception, rebooting..."
-            logger.exception("Unhandled Exception, non SerialError in SerialError exception, rebooting...")
-            os.system("systemctl reboot")
+    saveSettingsToFile(settings, path)
 
-    except pymongo.errors.AutoReconnect, e:
-        logger.error("Connection to database Lost, trying to reconnect every 30 seconds up to 500 times")
-        print "Connection lost"
-        timeout = 500
-        j = 0
-        while j <= timeout:
-            try:
-                client.database_names()  # try to reconnect
-                logger.info("Connection restabilished. Continuing...")
-                print "Connection restabilished. Continuing..."
-                j = timeout
-            except pymongo.errors.AutoReconnect, e:
-                if j == timeout:
-                    print "Connection could not be restabilished"
-                    logger.exception("Connection to database could not be restabilished. Now exiting...")
-                    raise
-                    sys.exit(0)  # Just in case raise doesn't raise
-                time.sleep(30)
-            j += 1
-
-    # except termios.error, e:
-    #     print "Termios error occured: " + str(e) + ' ' + e.message + 'on' + i.getName()
-    #     logger.error(("Termios error occured: " + str(e) + ' ' + e.message))
-    #     for j in xrange(5):
-    #         try:
-    #             i.check_connection(True)
-    #             i.read()
-    #             print "Fixed"
-    #             logger.info("Fixed")
-    #             break
-    #         except:
-    #             continue
-    #     if j >= 4:  # If unable, reboot board
-    #         # i.enable(False)
-    #         print "Rebooting board, due to termios error in: " + i.getName() + ' @ ' + i.getPort()
-    #         logger.error(("Rebooting board, due to termios error in: " + i.getName() + ' @ ' + i.getPort()))
-    #         os.system("systemctl reboot")
-
-    except KeyboardInterrupt, e:
-        print "Manual quit"
-        logger.error("Manual quit")
+    # Check and update hostname:
+    if settings['settings']['value']['hostname']['value'] != hostname:
+        subprocess.check_output("hostnamectl set-hostname " + settings['settings']['value']['hostname']['value'], shell=True)
+        output("New hostname set to: " + settings['settings']['value']['hostname']['value'] + "  Rebooting board.")
+        os.system("systemctl reboot")
         sys.exit(0)
 
+    output("\nUsing settings from DB\n")
+    uploadLog(client, log_path, settings['_id'])
+
+    return settings, client
+
+
+# Connects to mongoDB database
+def mongoConnect(server, username="", password=""):
+    """
+    Connects and authenticates to the server if username provided.
+
+    Notes:
+        Authentication uses the 'admin' database.
+
+    Args:
+        server (str): Server's URL or IP Address
+        username (str): DB Server's username. If provided, authentication will be used.
+        password (str): DB Server's password.
+
+    Returns:
+        DB Client (MongoClient).
+    """
+    try:
+        client = pymongo.MongoClient(server)
+        if len(username.strip()) > 0:
+            client.admin.authenticate(username, password)
+        output("Connected to " + client.host, logger.info)
+        return client
+    except pymongo.errors.ConnectionFailure:
+        output(('Could not connect to MongoDB at: "' + server + '"'), logger.error)
+        sys.exit(0)
+
+
+def insertData(data, client, settings):
+    """
+    Inserts data point to DB and Collection defined in settings.
+
+    Args:
+        data(JSON serializable dict): Data point.
+        client (MongoClient): MongoDB Client object
+        settings (dict): Current settings dictionary.
+    """
+    client[settings['settings']['value']['db_name']['value']][settings['settings']['value']['collection_name']['value']].insert(data)
+
+
+# # Parse json file into simple dictionary
+# def parseSettings(settings_json):
+#     # settings has:
+#     # status
+#     # settings {}
+#     # changes
+#     # sensors []
+#     # ip
+#     # version
+#     if settings_json is None:
+#         return None
+#     settings = {}
+#     for key in settings_json.keys():
+#         # Only keep values
+#         if isinstance(settings_json[key]['value'], dict):
+#             settings[key] = parseSettings(settings_json[key]['value'])
+#         elif isinstance(settings_json[key]['value'], list):
+#             for i in settings_json[key]['value']:
+#                 settings.setdefault(key, []).append(parseSettings(i))
+#         else:
+#             settings[key] = settings_json[key]['value']
+#     return settings
+
+
+# Check for updates
+def checkUpdates(current_settings, client, Id, path):
+    """
+    Checks settings on DB for updates, and updates file and running settings.
+
+    Notes:
+        Settings are retrieved/uploaded to the 'admin' database on the 'boards' collection by default.
+
+    Args:
+        current_settings (dict): current settings dictionary
+        client (MongoClient): MongoDB Client object
+        Id (str or ObjectId): Board Id, corresponding to settings/log entry Id on database
+        path (str): Path to config file
+
+    Returns:
+        settings dictionary if new settings are found on DB
+        None if no new settings are found on DB (conpared to current settings by date)
+        False if it was not possible to retrieve settings from DB
+
+    """
+    db_settings = getSettingsFromDB(client, Id)
+    if db_settings is None:
+        # Could not retrieve settings from db, deleted?
+        output("Problem retrieving settings from DB. Board may have been deleted from server", logger.error)
+        return False
+    # if time.strptime(getSettingsFromDB(client)['changes']['date'], "%d/%m/%y %I:%M:%S%p") > time.strptime(getSettingsFromFile(path)['changes']['date'],"%d/%m/%y %I:%M:%S%p"):
+    if current_settings['changes']['date'] < db_settings['changes']['date']:
+        output("New settings found on DB, updating...", logger.info)
+        saveSettingsToFile(db_settings, path)
+        # updateSettings(db_settings)  # settings is now equal to db_setings
+        output("New settings updated.", logger.info)
+        return db_settings
+    return None
+
+
+# Upload log file to server
+def uploadLog(client, log_path, Id):
+    """
+    Uploads the current log to the database.
+
+    Notes:
+        Log is uploaded to the 'admin' database on the 'log' collection by default.
+
+    Args:
+        client (MongoClient): MongoDB Client object
+        log_path (str): Path to log file
+        Id (str or ObjectId): Board Id, corresponding to settings/log entry Id on database
+
+    """
+    # Uploads only current log
+    try:
+        with open(log_path) as log_file:
+            text = log_file.read()
+            if not client['admin']['log'].update({'_id': ObjectId(Id)},
+                                                 {'_id': ObjectId(Id), 'contents': text}
+                                                 )['updatedExisting']:
+                client['admin']['log'].insert({'_id': ObjectId(Id), 'contents': text})
     except:
-        print "Unhandled Exception, non SerialError in main while loop, rebooting..."
-        logger.exception("Unhandled Exception, non SerialError in main while loop, rebooting...")
-        os.system("systemctl reboot")
+        output("Error uploading log, ignoring...", logger.error)
+
+
+# Save settings to config file
+def saveSettingsToFile(settings, path):
+    """
+    Saves the settings disctionary to the config file.
+
+    Args:
+        settings (dict): Current settings dictionary.
+        path (str): Path to config file.
+
+    """
+    try:
+        with open(path, 'w') as open_path:
+            open_path.writelines(json_util.dumps(settings, indent=4))
+    except:
+        output("Cannot write to file. Continuing without saving...", logger.error)
+
+
+# Save settings to DB
+def saveSettingsToDB(settings, client, Id):
+    """
+    Saves the settings file to the database, given an Id.
+
+    Notes:
+        Settings and Log are saved to the 'admin' database on the 'boards' collection by default.
+
+    Args:
+        settings (dict): Settings dictionary to be saved.
+        client (MongoClient): MongoDB Client object.
+        Id (str or ObjectId): Board Id, corresponding to settings entry Id on database.
+
+    Returns:
+        Id, if not already present on the database, inserting a new entry.
+        None, if error while saving.
+    """
+    try:
+        if Id is None:
+            # New Board
+            return client['admin']['boards'].insert(settings)  # return _id
+        if not client['admin']['boards'].update({'_id': ObjectId(Id)}, settings)['updatedExisting']:
+            # Id not found, create new entry
+            return client['admin']['boards'].insert(settings)  # return _id
+    except pymongo.errors.OperationFailure:
+        output("Error saving settings to DB", logger.error)
+        return None
+
+
+# Gets settings from config file
+def getSettingsFromFile(path):
+    """
+    Gets settings disctionary from config file.
+
+    Args:
+        path (str): Path to config file.
+
+    Returns:
+        Settings dictionary, if found.
+
+    Exceptions:
+        IOError, if file not found.
+    """
+    try:
+        with open(path) as open_path:
+            settings_json = json_util.loads(open_path.read())
+            return settings_json
+    except IOError, e:
+        if e.errno == 2:  # File not found
+            output("Config file not found. Now exiting...")
+            sys.exit(0)
+        else:
+            output("Unknown error while opening config file.")
+            raise
+            sys.exit(0)
+
+
+# Gets settings from database
+def getSettingsFromDB(client, Id):
+    """
+    Gets settings disctionary from DB given an Id.
+
+    Notes:
+        - Settings and Log are retrieved to the 'admin' database on the 'boards' collection by default.
+        - Assumes client has already been authenticated to, if needed.
+
+    Args:
+        client (MongoClient): MongoDB Client object.
+        Id (str or ObjectId): Board Id, corresponding to settings entry Id on database.
+
+    Returns:
+        Settings dictionary, if found.
+        None, if not found, if 'Id' is None, or error.
+    """
+    try:
+        if Id is None:
+            return None
+        return client['admin']['boards'].find_one({'_id': ObjectId(Id)})
+    except pymongo.errors.OperationFailure:
+        output("Error getting settings to DB", logger.error)
+        return None
+
+
+def waitForInternet(wait):
+    """
+    Wait for internet connection for a given amount of time.
+
+    Notes:
+        Exits after timeout.
+
+    Args:
+        wait (int): Time to keep waiting for internet connection.
+    """
+    try:
+            urllib2.urlopen('http://www.google.com', timeout=5)  # change this to connect to server (if on intranet)
+            output("Connection estabilished\n", logger.info)
+    except urllib2.URLError:
+        t = time.time()
+        output("Waiting up to: " + str(wait) + " seconds for connection...", logger.info)
+        while (time.time() - t) < wait:
+            try:
+                urllib2.urlopen('http://www.google.com', timeout=5)  # change this to connect to server (if on intranet)
+                output("Connection estabilished", logger.info)
+                return
+            except urllib2.URLError:
+                time.sleep(10)
+        output("No Connection, exiting...", logger.info)
+        sys.exit(0)
+
+
+def output(message, log_func=None, verbose=True):
+    """
+    Outputs the message to stdio and/or log.
+
+    Args:
+        message (str): Message to be displayed.
+        log_func(logging object, optional): If provided, message is printed on logger provided (l.info/l.error).
+        verbose (bool, Default: False): If True, prints message to stdio.
+    """
+    if verbose:
+        print message
+    if log_func is not None:
+        log_func(message)
+
+
+# Finds and matches serial ports with sensors (using sysfs paths) on file, if all not matched, exit.
+# Also adds sysfs path to config file if /dev/ttyUSBx provided
+def matchSerialPorts(settings, client, path):
+    """
+    Matches the available tty ports in the '/dev/' path to the paths in the settings file. If all
+    paths from the settings file cannot be matched, exit.
+    If any of the paths is using the '/dev/ttyUSBx' format, find sysfs path, and save to DB/File.
+
+    Notes:
+        - Replaces '/dev/ttyUSBx' paths for sysfs paths, and saves to DB/File.
+        - No need for 'Id' arg, since settings dictionary is provided.
+
+
+    Args:
+        settings (dict): Settings dictionary to be used for matching. Paths can be of sysfs or '/dev/ttyUSBx' type.
+        client (MongoClient): MongoDB Client object.
+        path (str): Path to config file.
+    """
+    available_ports = listPorts()
+    update = False
+    if len(available_ports) == 0:
+        output("No ports found. Now exiting.", logger.error)
+        sys.exit(0)
+    ports = []
+    syspaths = []
+    for i in available_ports:
+        ports.append(i[0])  # get only ttyUSBx values
+        syspaths.append(getSysPathFromTTY(i[0]))
+    for i in settings['sensors']['value']:
+        if i['path']['value'].strip().find('/dev/') == 0:  # If starts with /dev/ must be /dev/ttyUSBx
+            settings['sensors']['value'][settings['sensors']['value'].index(i)]['path']['value'] = getSysPathFromTTY(i['path']['value'])
+            update = True
+        if i['path']['value'] not in syspaths:  # Check if path in the settings file doesn't exist in sysfs (syspaths)
+            output("Not all sensors are connected, check connections and try again. Now exiting.", logger.error)
+            sys.exit(0)
+    if update:
+        #  Add syspaths to config file, and push to server:
+        output("Updated syspaths", logger.info)
+        saveSettingsToFile(settings, path)
+        saveSettingsToDB(settings, client, settings['_id'])
+
+
+def getTTYFromPath(path):
+    """
+    Returns the '/dev/ttyUSBx' given either a sysfs path string or a '/dev/ttyUSBx' string.
+
+    Notes:
+        If given a '/dev/ttyUSBx' string, the function simply returns 'path'
+
+    Args:
+        path (str): sysfs or /dev path to USB device.
+
+    Returns:
+        str: returns a properly formatted '/dev/ttyUSBx' path
+    """
+    path = path.strip()
+    if path.find('/dev/') == 0:  # If starts with /dev/ must be /dev/ttyUSBx
+        return path
+    arg = 'ls ' + path + ' |grep tty'  # Build arg string: ls /sys/path/... |grep tty
+    port = '/dev/' + subprocess.check_output(arg, shell=True)[0:-1]  # Remove \n, and prepend /dev/
+    if(port == '/dev/tty'):  # Ubuntu/Debian exception, handle 'tty' subfolder
+            arg = 'ls ' + path + '/tty |grep tty'
+            port = '/dev/' + subprocess.check_output(arg, shell=True)[0:-1]
+    return port.strip()
+
+
+def getSysPathFromTTY(TTY):
+    """
+    Returns the sysfs path given a '/dev/ttyUSBx' path string.
+
+    Args:
+        path (str): /dev path to USB device.
+
+    Returns:
+        str: returns a properly formatted sysfs path
+    """
+    TTY = TTY.strip()
+    arg = 'udevadm info -q path -n ' + TTY  # String to be executed: udevadm info -q path -n /dev/ttyUSBx
+    res = subprocess.check_output(arg, shell=True)  # Returns sysfs path
+    path = '/sys' + res[0:res.index('tty')]  # prepend /sys and remove tty folder
+    return path.strip()
+
+
+def instantiateSensors(sensors_list):
+    """
+    Creates and returns a list of properly initialized sensors given a list of standard sensor
+    configuration data.
+
+    Args:
+        sensors_list (list): List containing multiple sensor configuration data (dictionary), like such:
+
+            [sensor_1, sensor_2, ...]
+
+            Where sensor_n is a standard format sensor configuration dictionary:
+            sensor_n = {
+                "path": {
+                    "title": "Sysfs path or ttyUSBX port (System will convert to sysfs path)",
+                    "type": "string",
+                    "value": ""
+                },
+                "baud_rate": {
+                    "title": "Baud Rate",
+                    "type": "integer",
+                    "value": 0
+                },
+                "name": {
+                    "title": "Measurement Names (comma separated)",
+                    "type": "string",
+                    "value": ""
+                },
+                "wait_time": {
+                    "title": "Waiting time between measurements (milliseconds)",
+                    "type": "integer",
+                    "value": 0
+                },
+                "units": {
+                    "title": "Measurement Units (comma separated)",
+                    "type": "string",
+                    "value": ""
+                }
+            }
+
+        Note that sensor_n['path']['value'] may be either a sysfs path or a /dev/ttyUSBx path, such as:
+
+            sensor_n['path']['value'] = '/sys/devices/platform/...''
+        or
+            sensor_n['path']['value'] = '/dev/ttyUSB0'
+
+    Returns:
+        list: List containing initialized sensors (instances of SerialSensor):
+    """
+    sensors = []
+    for i in sensors_list:  # Instantiate sensors defined in settings file
+        port = getTTYFromPath(i['path']['value'])
+        try:
+            # initialize sensors:
+            sensors.append(SerialSensor(i['name']['value'],
+                                        i['units']['value'],
+                                        port,
+                                        i['wait_time']['value'],
+                                        i['baud_rate']['value'],
+                                        read_command=i['read_command']['value']
+                                        ))
+        except SerialError, e:
+            output('Could not initialize sensor "' + i['name']['value'] + '"', logger.error)
+            raise
+    return sensors
+
+
+def main():
+    global counter
+    global client
+
+    # initialization routine, and get new settings and DB client
+    settings, client = initialize(config_path, hostname, version)
+    # log settings
+    printout = '\nVersion:                  ' + version + \
+               '\nStatus:                   ' + settings['status']['value'] + \
+               '\nDescription:              ' + settings['settings']['value']['description']['value'] + \
+               '\nLocation:                 ' + settings['settings']['value']['location']['value'] + \
+               '\nHostname:                 ' + hostname + \
+               '\nIP Address:               ' + ip_address + \
+               '\nID:                       ' + str(settings['_id']) + \
+               '\nLast updated settings:    ' + settings['changes']['date'] + \
+               '\n\nUsing settings:\n' + \
+               '\nServer:                   ' + settings['settings']['value']['server']['value'] + \
+               '\nDB name:                  ' + settings['settings']['value']['db_name']['value'] + \
+               '\nCollection name:          ' + settings['settings']['value']['collection_name']['value'] + \
+               '\nFrequency (seconds):      ' + settings['settings']['value']['sensor_reading_frequency']['value'] + '\n'
+    output(printout, logger.info)
+    del printout
+
+    # Find and match serial ports:
+    matchSerialPorts(settings, client, config_path)
+
+    # If all sensors from settings found, continue:
+    sensors = instantiateSensors(settings['sensors']['value'])
+
+    # Display initialized sensors
+    output("Available sensors:", logger.info)
+    for i in sensors:
+        output(i.getName() + ' @ ' + i.getPort() + " , Units: " +
+               i.getUnits() + " , Waiting time: " + str(i.getWaitTime()) + 'ms', logger.info)
+
+    output("Data points to date: " +
+           str(client[settings['settings']['value']['db_name']['value']]
+               [settings['settings']['value']['collection_name']['value']].count()), logger.info)
+
+    output("Reading Started...", logger.info)
+
+    # End of initialization
+    # Start reading:
+    # Main Loop
+
+    while True:
+
+        new_settings = checkUpdates(settings, client, settings['_id'], config_path)
+
+        uploadLog(client, log_path, settings['_id'])
+
+        if new_settings is not None:
+            if new_settings is False:
+                # Settings has been deleted from server
+                sys.exit(0)
+            return
+
+        try:
+            initial_time = time.time()
+            JSON_readings = {}  # clear dictionary for nex reading
+            for i in sensors:
+                if i.isEnabled():
+                    reading = i.read()
+                    JSON_readings.update(reading)
+            if JSON_readings == {} and counter > 2:
+                # If all sensors are disabled
+                output("No data being sent, exiting.", logger.error)
+                sys.exit(0)
+            counter += 1
+            JSON_readings['date'] = now()
+            insertData(JSON_readings, client, settings)
+            print counter
+            print JSON_readings
+            print '\n'
+            final_time = time.time()
+            sleep = (float(settings['settings']['value']['sensor_reading_frequency']['value']) - (final_time - initial_time))
+            if sleep >= 0.0:
+                time.sleep(sleep)
+            else:
+                output("Running at " + str(final_time - initial_time) + " seconds per reading, \
+                      more than defined reading frequency. Make necessary adjustments.", logger.info)
+
+        except SerialError, e:
+            output(e, logger.error)
+            logger.exception("The previous error was due to the following exception:")
+            try:
+                i.read()
+                output("No problems found", logger.info)
+            except SerialError, e:
+                for j in xrange(4):
+                    try:
+                        i.close()
+                        i.open()
+                        i.read()
+                        break
+                    except:
+                        logger.exception("Exception occured during #" + str(j) + " trial.")
+                        time.sleep(1)
+                if j >= 3:  # If exhausted trials
+                    try:
+                        i.close()
+                        i.open()
+                        i.read()
+                    except SerialError, e:
+                        if e.errno == 5:
+                            output("Reloading sensors due to exception in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
+                            return
+                    except:
+                        output("Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
+                        uploadLog(client, log_path, settings['_id'])
+                        os.system("systemctl reboot")
+                        sys.exit(0)
+            except:
+                output("Unhandled Exception, non SerialError in SerialError exception, rebooting...")
+                logger.exception("Unhandled Exception, non SerialError in SerialError exception, rebooting...")
+                uploadLog(client, log_path, settings['_id'])
+                os.system("systemctl reboot")
+                sys.exit(0)
+
+        except pymongo.errors.AutoReconnect, e:
+            output("Connection to database Lost, trying to reconnect every 30 seconds up to 500 times", logger.error)
+            timeout = 500
+            j = 0
+            while j <= timeout:
+                try:
+                    client.database_names()  # try to reconnect
+                    output("Connection restabilished. Continuing...", logger.info)
+                    j = timeout
+                except pymongo.errors.AutoReconnect, e:
+                    if j == timeout:
+                        output("Connection to database could not be restabilished. Now exiting...", logger.exception)
+                        raise
+                        sys.exit(0)  # Just in case raise doesn't raise
+                    time.sleep(30)
+                j += 1
+
+        except KeyboardInterrupt, e:
+            output("Manual quit", logger.error)
+            uploadLog(client, log_path, settings['_id'])
+            sys.exit(0)
+
+        except:
+            output("Unhandled Exception, non SerialError in main while loop, rebooting...", logger.exception)
+            uploadLog(client, log_path, settings['_id'])
+            os.system("systemctl reboot")
+            sys.exit(0)
+
+        finally:
+            uploadLog(client, log_path, settings['_id'])
+
+
+if __name__ == '__main__':
+    output("\n\nStarted execution:\n\n", logger.info)
+
+    # Waits for internet connection (up to 3600 seconds), exits if not found.
+    waitForInternet(3600)
+    while True:
+        main()
