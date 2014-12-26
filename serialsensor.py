@@ -3,7 +3,7 @@ import serial
 import time
 from serial.tools.list_ports import comports
 
-SerialSensor_version = "0.8 Build 6"
+SerialSensor_version = "1.0 Build 5"
 
 CRLF = 0
 CR = 1
@@ -18,7 +18,7 @@ def listPorts():
 # #1: Device not found
 # #2: Invalid Data Type
 # #3: No data read
-# #5: Termios I/O error (used for repair)
+# #5: I/O error
 # #6: Did not receive EOL character, assuming corrupted data. (/r or /n or /r/n)
 
 
@@ -61,7 +61,7 @@ class SerialSensor:
             units (str): Units of the sensor/measurements (e.g. 'C,RH').
             serial_port (str): Serial port of the sensor (e.g. /dev/ttyUSBx).
             wait_time (int): Time to wait for response (in milliseconds).
-            read_command (object or str): Function returning one string to be sent to sensor, if\
+            read_command (object or str): Function returning a string, or string, to be sent to sensor, if
             none defined read() method cannot be used. (e.g. lambda: 'R', or 'R').
 
         Optional Arguments:
@@ -90,10 +90,19 @@ class SerialSensor:
             self.__connection = Serial(serial_port, baud_rate, bytesize=bytesize, parity=parity,
                                        stopbits=stopbits, timeout=timeout, writeTimeout=writeTimeout)
             self.__connection.write('\r')  # Sometimes first commands are read as error, this prevents that
+
         except serial.SerialException, e:
-            raise SerialError("Could not connect to serial device during initialization", self.__name, self.__serial_port, 0, 'SerialSensor()', e.message)
-        except serial.SerialTimeoutException:
-            raise SerialError("Timeout on device during initialization", self.__name, self.__serial_port, 0, 'SerialSensor()')
+            raise SerialError("Could not connect to serial device during initialization.", self.__name, self.__serial_port, 0, 'SerialSensor()', e.message)
+        except termios.error:
+            raise SerialError("Could not connect to serial device -> TERMIOS error during initialization.", self.__name, self.__serial_port, 5, 'SerialSensor()')
+        except IOError, e:
+            raise SerialError("Could not connect to serial device -> IOError during initialization.", self.__name, self.__serial_port, 5, 'SerialSensor()')
+        except OSError, e:
+            raise SerialError("Could not connect to serial device -> OSError during initialization.", self.__name, self.__serial_port, 5, 'SerialSensor()')
+        except Exception, e:
+            raise SerialError("Unhandled error during initialization.", self.__name, self.__serial_port, 0, 'SerialSensor()', "Error: " + str(e))
+        except:
+            raise SerialError("Unknown exception during initialization.", self.__name, self.__serial_port, 0, 'SerialSensor()')
         time.sleep(0.3)  # Wait for receive buffer to fill
         self.__connection.flushInput()
         self.__connection.flushInput()
@@ -114,6 +123,7 @@ class SerialSensor:
             self.__connection.flushInput()
         except termios.error:
             raise SerialError("Could not connect to serial device -> TERMIOS error.", self.__name, self.__serial_port, 0, 'send()', "flushInput() call")
+        command = str(command)  # Gets rid of unicode strings
         if command[-1:] != '\n' or command[-1:] != '\r':  # If line ending not defined, default to CR
             command += '\r'
         time.sleep(0.1)
@@ -123,8 +133,12 @@ class SerialSensor:
             raise SerialError("Timeout on device", self.__name, self.__serial_port, 0, 'send()', "write() call")
         except serial.SerialException, e:
             raise SerialError("Could not connect to serial device -> SerialException.", self.__name, self.__serial_port, 0, 'send()', "write() call " + e.message)
+        except termios.error:
+            raise SerialError("Could not connect to serial device, TERMIOS error.", self.__name, self.__serial_port, 5, 'send()', "write() call")
         except IOError:
-            raise SerialError("Could not connect to serial device -> IOError.", self.__name, self.__serial_port, 0, 'send()', "write() call")
+            raise SerialError("Could not connect to serial device -> IOError.", self.__name, self.__serial_port, 5, 'send()', "write() call")
+        except OSError:
+            raise SerialError("Could not connect to serial device -> OSError.", self.__name, self.__serial_port, 5, 'send()', "write() call")
 
     def readRaw(self):
         """readRaw() reads the serial buffer as ASCII characters up to a Carriage Return or Line Feed.
@@ -139,9 +153,11 @@ class SerialSensor:
         except serial.SerialException, e:
             raise SerialError("Failed reading serial device -> SerialException.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call " + e.message)
         except termios.error:
-            raise SerialError("Could not connect to serial device, TERMIOS error.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call")
+            raise SerialError("Could not connect to serial device, TERMIOS error.", self.__name, self.__serial_port, 5, 'readRaw()', "inWaiting() call")
         except IOError:
-            raise SerialError("Could not connect to serial device, IOError.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call")
+            raise SerialError("Could not connect to serial device, IOError.", self.__name, self.__serial_port, 5, 'readRaw()', "inWaiting() call")
+        except OSError:
+            raise SerialError("Could not connect to serial device -> OSError.", self.__name, self.__serial_port, 5, 'readRaw()', "inWaiting() call")
         except Exception, e:
             raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call, Error: " + str(e))
         if buff == 0:
@@ -158,13 +174,15 @@ class SerialSensor:
                 string += char
             self.__last_read_string = string
         except serial.SerialTimeoutException:
-            raise SerialError("Timeout on device -> SerialTimeoutException", self.__name, self.__serial_port, 0, 'readRaw()')
+            raise SerialError("Timeout on device -> SerialTimeoutException.", self.__name, self.__serial_port, 0, 'readRaw()')
         except serial.SerialException, e:
             raise SerialError("Failed reading serial device -> SerialException.", self.__name, self.__serial_port, 0, 'readRaw()', e.message)
         except termios.error:
-            raise SerialError("Could not connect to serial device -> TERMIOS error.", self.__name, self.__serial_port, 0, 'readRaw()')
+            raise SerialError("Could not connect to serial device -> TERMIOS error.", self.__name, self.__serial_port, 5, 'readRaw()')
         except IOError:
-            raise SerialError("Could not connect to serial device -> IOError.", self.__name, self.__serial_port, 0, 'readRaw()')
+            raise SerialError("Could not connect to serial device -> IOError.", self.__name, self.__serial_port, 5, 'readRaw()')
+        except OSError:
+            raise SerialError("Could not connect to serial device -> OSError.", self.__name, self.__serial_port, 5, 'readRaw()')
         except Exception, e:
             raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'readRaw()', "Error: " + str(e))
         return string
@@ -283,11 +301,13 @@ class SerialSensor:
             self.__connection.open()
             time.sleep(0.2)
         except SerialException, e:
-            raise SerialError("Could not connect to serial device -> SerialException", self.__name, self.__serial_port, 0, 'open()', e.message)
+            raise SerialError("Could not connect to serial device -> SerialException.", self.__name, self.__serial_port, 0, 'open()', e.message)
         except termios.error:
-            raise SerialError("Could not connect to serial device -> TERMIOS error.", self.__name, self.__serial_port, 0, 'open()')
+            raise SerialError("Could not connect to serial device -> TERMIOS error.", self.__name, self.__serial_port, 5, 'open()')
         except IOError:
-            raise SerialError("Could not connect to serial device -> IOError.", self.__name, self.__serial_port, 0, 'open()')
+            raise SerialError("Could not connect to serial device -> IOError.", self.__name, self.__serial_port, 5, 'open()')
+        except OSError:
+            raise SerialError("Could not connect to serial device -> OSError.", self.__name, self.__serial_port, 5, 'open()')
         except Exception, e:
             raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'open()', "Error: " + str(e))
         except:
@@ -307,16 +327,16 @@ class SerialSensor:
         return str(self.__serial_port)
 
     def getWaitTime(self):
-        return self.__wait_time
+        return float(self.__wait_time)
 
     def getBaud(self):
-        return self.__baud_rate
+        return int(self.__baud_rate)
 
     def getUnits(self):
         return str(self.__units)
 
     def getLastString(self):
-        return self.__last_read_string
+        return str(self.__last_read_string)
 
     def getJSONSettings(self, name, value):
         return {"name": self.getName(), "units": self.getUnits(), "wait_time": self.getWaitTime(),
