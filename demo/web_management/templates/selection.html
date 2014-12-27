@@ -29,7 +29,13 @@
                                 {% for board in ids.itervalues() %}
                                 <!-- boards = {hostname, collection_name, _id} -->
                                 <div class="panel-body">
-                                    <p><a href="boards/{{ board['_id'] }}"><i>{{ board["hostname"] }} @ {{ board["collection_name"] }}</i></a></p>
+                                    {% if board['status'] != "Running" %}
+                                        <h6 style="display: inline-block;"><span class="label label-danger" style="border-radius: 200px; display: inline; vertical-align: top;"> </span></h6>
+                                        <a href="boards/{{ board['_id'] }}"><i>  {{ board["hostname"] }} @ {{ board["collection_name"] }}</i></a>                                        
+                                    {% else %}
+                                        <h6 style="display: inline-block;"><span class="label label-success" style="border-radius: 200px; display: inline; vertical-align: top;"> </span></h6>
+                                        <a href="boards/{{ board['_id'] }}"><i>  {{ board["hostname"] }} @ {{ board["collection_name"] }}</i></a>
+                                    {% endif %}
                                 </div>
                                 {% endfor %}
                             </div>

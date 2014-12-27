@@ -3,7 +3,6 @@ import collections
 import json
 import time
 import copy
-import StringIO
 
 # Flask Imports
 from flask import Flask
@@ -22,8 +21,8 @@ from bson.objectid import ObjectId
 
 # Connect to MongoDB
 try:
-    client = pymongo.MongoClient("cityfarm.media.mit.edu")
-    client.admin.authenticate("admin", "cityfarm")
+    client = pymongo.MongoClient("")
+    client.admin.authenticate("", "")
     board_collection = client['admin']['boards']  # Default DB and collection for storing board settings
     log_collection = client['admin']['log']  # Default DB and collection for storing logs
     # Note that logs and settings are stored with the same ObjectId, which also corresponds to the board's Id
@@ -50,7 +49,8 @@ def board_selection():
         ids[i['_id']] = {
             "collection_name": i['settings']['value']['collection_name']['value'],
             "hostname": i['settings']['value']['hostname']['value'],
-            "_id": i['_id']
+            "_id": i['_id'],
+            "status": i['status']['value']
         }
         db_names[i['settings']['value']['db_name']['value']].update(ids)
     # format: db_names = {db_1: {collection_1:{collection_1, hostname, _id}, ...}, ...}
