@@ -708,7 +708,7 @@ def main():
                       more than defined reading frequency. Make necessary adjustments.", logger.info)
 
         except SerialError, e:
-            output("\n\n" + e, logger.error)
+            output("\n\n" + repr(e), logger.error)
             output("The previous error was due to the following exception:", logger.error)
             output(e.SourceTraceback(), logger.error)
             try:
