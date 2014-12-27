@@ -73,7 +73,8 @@ class SerialSensor:
         Instatiates a sensor.
 
         Notes:
-            The default baudrate is 9600bps
+            - The default baudrate is 9600bps
+
 
         Required Arguments:
             name (str): Name of the sensor/measurements (e.g. 'Temperature,Humidity').

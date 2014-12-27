@@ -3,7 +3,6 @@ import collections
 import json
 import time
 import copy
-import StringIO
 
 # Flask Imports
 from flask import Flask
@@ -22,8 +21,8 @@ from bson.objectid import ObjectId
 
 # Connect to MongoDB
 try:
-    client = pymongo.MongoClient("server")
-    client.admin.authenticate("username", "password")
+    client = pymongo.MongoClient("")
+    client.admin.authenticate("", "")
     board_collection = client['admin']['boards']  # Default DB and collection for storing board settings
     log_collection = client['admin']['log']  # Default DB and collection for storing logs
     # Note that logs and settings are stored with the same ObjectId, which also corresponds to the board's Id
@@ -35,7 +34,7 @@ except pymongo.errors.ConnectionFailure:
 
 @app.route("/", methods=['GET'])
 def board_selection():
-    cursor = collection.find()
+    cursor = board_collection.find()
     if cursor.count() == 0:
         return render_template("selection.html", dbs={})
     db_names = {}
@@ -50,7 +49,8 @@ def board_selection():
         ids[i['_id']] = {
             "collection_name": i['settings']['value']['collection_name']['value'],
             "hostname": i['settings']['value']['hostname']['value'],
-            "_id": i['_id']
+            "_id": i['_id'],
+            "status": i['status']['value']
         }
         db_names[i['settings']['value']['db_name']['value']].update(ids)
     # format: db_names = {db_1: {collection_1:{collection_1, hostname, _id}, ...}, ...}
@@ -351,7 +351,7 @@ def build_settings_board(request, board_info):
 
 def findBoardById(Id):
     try:
-        board_info = collection.find_one({'_id': ObjectId(Id)})
+        board_info = board_collection.find_one({'_id': ObjectId(Id)})
     except pymongo.errors.OperationFailure:
         return None
     if board_info is None:
@@ -363,8 +363,8 @@ def removeBoardById(Id):
     if Id is None:
         return False
     try:
-        collection.remove({'_id': ObjectId(Id)})
-        client['admin']['log'].remove({'_id': ObjectId(Id)})
+        board_collection.remove({'_id': ObjectId(Id)})
+        log_collection.remove({'_id': ObjectId(Id)})
         return True
     except pymongo.errors.OperationFailure:
         return False
@@ -372,8 +372,8 @@ def removeBoardById(Id):
 
 def findLogById(Id):
     try:
-        board_info = client['admin']['log'].find_one({'_id': ObjectId(Id)})
-        board_info.update(collection.find_one({'_id': ObjectId(Id)}))  # Add some required info for the log page
+        board_info = log_collection.find_one({'_id': ObjectId(Id)})
+        board_info.update(board_collection.find_one({'_id': ObjectId(Id)}))  # Add some required info for the log page
     except pymongo.errors.OperationFailure:
         return None
     return board_info
@@ -381,7 +381,7 @@ def findLogById(Id):
 
 def updateBoardById(Id, data):
     try:
-        collection.update({'_id': ObjectId(Id)}, data)
+        board_collection.update({'_id': ObjectId(Id)}, data)
     except pymongo.errors.OperationFailure:
         return False
     return True

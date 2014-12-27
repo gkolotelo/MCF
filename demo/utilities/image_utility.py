@@ -53,7 +53,7 @@ Instructions:
         The server address (URL or IP Address) in hands, as well as the username and password
         of the database.
 
-    4.
+    4.  
         If you have ALL the items above, you can proceed to burning your image
         into the SD Card. To do that, follow the instructions below:
 
@@ -72,7 +72,7 @@ Instructions:
             image_utility TARGET_DISK SOURCE_IMAGE [ADDITIONAL_FILES]...
 
                 user$: ./image_utility.py /dev/sdb archlinux_cityfarm_image_3_12_34_ARCH.img
-
+            
             Or with additional files:
 
                 user$: ./image_utility.py /dev/sdb archlinux_cityfarm_image_3_12_34_ARCH.img whatever_file.txt
@@ -111,7 +111,7 @@ try:
     target_disk = sys.argv[1]
     if target_disk.find('dev') == -1:
         print "Invalid target disk."
-        sys.exit(0)
+        #sys.exit(0)
 except:
     print "No target disk set."
     sys.exit(0)
@@ -152,12 +152,12 @@ if raw_input("Press Enter to continue...") != '':
     print "Aborting"
     sys.exit(0)
 
-print "\nMounting image...\n"
+print "Mounting image..."
 # arg in the format: fdisk -l source_image.img | grep Linux| awk '{print $2}'
 # Finds Linux type partition on disk image, and returns starting sector
 arg = "fdisk -l " + source_image + " | grep Linux | awk '{print $2}'"
 number_of_sectors = subprocess.check_output(arg, shell=True)
-# Finds the size of each sector
+#Finds the size of each sector
 arg = "fdisk -l " + source_image + ' | grep "Sector size" | awk ' + "'{print $4}'"
 sector_size = subprocess.check_output(arg, shell=True)
 
@@ -174,6 +174,7 @@ except:
 subprocess.check_output("mkdir " + mount_point, shell=True)
 subprocess.check_output("mount -t auto -o loop,offset=" + starting_size + ' ' + source_image + ' ' + mount_point, shell=True)
 
+print "Mounting succesful"
 print "Copying files:"
 
 rpi_root_folder = mount_point + '/root/RPi/'
@@ -206,7 +207,7 @@ fp = open(rpi_root_folder + 'config.json', 'w+')
 fp.write(json.dumps(settings, indent=4))
 fp.close()
 
-print "\nUnmounting image.\n"
+print "Unmounting image."
 
 subprocess.check_output("umount " + mount_point, shell=True)
 subprocess.check_output("rmdir " + mount_point, shell=True)
@@ -214,15 +215,23 @@ subprocess.check_output("rmdir " + mount_point, shell=True)
 if raw_input("Image preparation finished, press Enter to continue...") != '':
     print "Aborting"
     sys.exit(0)
-
-print "\nBurning image to SD Card at " + target_disk
-print "Image burning may take as long as 15 minutes, please wait.\n\n"
+print "Unmounting disk partitions (errors are expected)."
+try:
+    subprocess.check_output("umount -f " + target_disk + '*', shell=True)
+except:
+    pass
+print "Burning image to SD Card at " + target_disk
+print "Image burning may take as long as 15 minutes, please wait."
 
 try:
-    # Note that bs=1M (capital M is being used)
-    print subprocess.check_output("dd if=" + source_image + " of=" + target_disk + " bs=1M")
+    print subprocess.check_output("dd if=" + source_image + " of=" + target_disk + " bs=1M", shell=True)
 except KeyboardInterrupt:
     print "Aborted by user."
     sys.exit(0)
 
-print "Process complete!"
+try:
+    subprocess.check_output("umount -f " + target_disk + '*', shell=True)
+except:
+    pass
+
+print "Process complete! You may now remove the SD Card."

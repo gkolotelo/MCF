@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>Select a Board</title>
+        <script type="text/javascript" src="/static/lib/jquery/dist/jquery.min.js"></script>
+        <script type="text/javascript" src="/static/lib/bootstrap/dist/js/bootstrap.js"></script>
+        <link rel="stylesheet" href="/static/lib/bootstrap/dist/css/bootstrap.css">
+        <link rel="stylesheet" href="/static/style/default.css">
+    </head>
+    <body>
+        <div class="container">
+            <div class="page-header">
+                <h1 style="display: inline-block; vertical-align: middle">
+                    Select a Board to Manage
+                </h1>
+            </div>
+                <div >
+                    {% macro list_boards(dbs) %}
+                    <div style="width: 100%">
+                        {% for db, ids in dbs.iteritems() %}
+                            <div class="panel panel-default" style="display: inline-block; margin: 10px; width: 47.7%">
+                                <div class="panel-heading">
+                                    {% if db == '' %}
+                                        <h3 class="panel-title"> Uninitialized Boards</h3>
+                                    {% else %}
+                                        <h3 class="panel-title">{{ db }}</h3>
+                                    {% endif %}
+                                </div>
+                                {% for board in ids.itervalues() %}
+                                <!-- boards = {hostname, collection_name, _id} -->
+                                <div class="panel-body">
+                                    <p><a href="boards/{{ board['_id'] }}"><i>{{ board["hostname"] }} @ {{ board["collection_name"] }}</i></a></p>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% endmacro %}
+                    <div style="font-size: 25px">
+                        {% block content %}
+                        {{ list_boards(dbs) }}
+                        {% endblock %}  
+                    </div>
+                </div>
+            </div>
+        </div>
+    </body>
+</html>

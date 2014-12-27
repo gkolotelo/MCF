@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <title>{{name}} log file</title>
+        <script type="text/javascript" src="/static/lib/jquery/dist/jquery.min.js"></script>
+        <script type="text/javascript" src="/static/lib/bootstrap/dist/js/bootstrap.js"></script>
+        <link rel="stylesheet" href="/static/lib/bootstrap/dist/css/bootstrap.css">
+        <link rel="stylesheet" href="/static/style/default.css">
+        <script type="text/javascript" src="/static/lib/underscore/underscore.js"></script>
+        <script type="text/javascript" src="/static/lib/JSV/lib/jsv.js"></script>
+        <script type="text/javascript" src="/static/lib/jsonform/lib/jsonform.js"></script>
+        <script type="text/javascript">
+            var log_data = "{{ log_file | safe }}";
+            $(function() {
+                $('#log').append(log_data);
+                setTimeout( function(){$('html, body').animate({scrollTop:document.body.scrollHeight}, 800);}, 600 );
+                
+            });
+        </script>
+    </head>
+    <body>
+        <div class="container">
+            <div class="page-header">
+                <a href="/boards/{{ _id }}" class="btn btn-primary btn-default" role="button" style="display: inline-block; margin-right: 40px; margin-left:-102px;vertical-align: middle; margin-top: 10px">Back</a>
+                <h1 style="display: inline-block; vertical-align: middle">
+                    Log file for <i>{{ collection_name }} @ {{ hostname }}</i>
+                </h1>
+            </div>
+            <div>
+                <div style="margin-left: -70px; margin-bottom: -2em;">
+                <div>Oldest <span class="glyphicon glyphicon-arrow-right"></span></div>
+                </div>
+                <pre id="log" style="font-size: 90%">
+                </pre>
+                <div style="margin-left: -80px; margin-top: -2.8em; position: absolute">Newest <span class="glyphicon glyphicon-arrow-right"></span></div>
+            </div>
+            <footer style="margin: 40px 0px" id="bottom">
+                <a href="javascript:$('html, body').animate({scrollTop:0}, 400);" class="btn btn-primary btn-default" role="button"><span class="glyphicon glyphicon-chevron-up"></span></a>
+            </footer>
+        </div>
+    </body>
+</html>
