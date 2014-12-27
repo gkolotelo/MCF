@@ -100,8 +100,8 @@ Web management script and supporting files
 Installation
 ------------
 
-Download prebuild Arch Linux 3.12.34:
-[ArchLinux_3.12.34](https://drive.google.com/file/d/0Bzu5DJ7GsPj5WG1rY1U2VHl6czA/view)
+Download prebuild [Arch Linux 3.12.34](https://drive.google.com/file/d/0Bzu5DJ7GsPj5WG1rY1U2VHl6czA/view)
+
 (The image does not contain the scripts, which will be added by the image utility, the image does, however, contain all supporting libraries needed.)
 
 Use the provided image utility to copy and configure the image for deployment:
