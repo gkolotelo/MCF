@@ -39,7 +39,7 @@ from serialsensor import *
 
 # Global Variables:
 # Version number
-version = "1.1 Build 8"
+version = "1.1 Build 9"
 # Variable to count the number of data points sent
 counter = 0
 # Board's hostname
@@ -491,8 +491,6 @@ def output(message, log_func=None, verbose=True):
         log_func(message)
 
 
-# Finds and matches serial ports with sensors (using sysfs paths) on file, if all not matched, exit.
-# Also adds sysfs path to config file if /dev/ttyUSBx provided
 def matchSerialPorts(settings, client, path):
     """
     Matches the available tty ports in the '/dev/' path to the paths in the settings file. If all
@@ -525,7 +523,8 @@ def matchSerialPorts(settings, client, path):
             update = True
         if i['path']['value'] not in syspaths:
             # Check if path in the settings file doesn't exist in sysfs (syspaths)
-            output("Not all sensors are connected, check connections and try again. Now exiting.", logger.error)
+            output("Not all sensors are connected. Now exiting. Check connections and try again:", logger.error)
+            output("Sensor: " + i['path']['value'], logger.error)
             quit()
     if update:
         #  Add syspaths to config file, and push to server:
