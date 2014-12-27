@@ -1,0 +1,110 @@
+{
+    "changes": {
+        "title": "Changes",
+        "type": "info",
+        "date": "",
+        "value": ""
+    },
+    "version": {
+        "title": "Version Number",
+        "type": "info",
+        "value": ""
+    },
+    "ip" : {
+        "title": "IP Address",
+        "type": "info",
+        "value": ""
+    },
+    "status": {
+        "title": "Status",
+        "type": "info",
+        "value": ""
+    },
+    "settings": {
+        "title": "Settings",
+        "type": "object",
+        "value": {
+            "collection_name": {
+                "title": "Sensor Collection Name", 
+                "type": "string",
+                "value": ""
+            },
+            "db_name": {
+                "title": "DB Name",
+                "type": "string",
+                "value": ""
+            },
+            "sensor_reading_frequency": {
+                "title": "Sensor Reading Frequency (Seconds)",
+                "type": "integer",
+                "value": 0
+            },
+            "hostname": {
+                "title": "Hostname",
+                "type": "string",
+                "value": ""
+            },
+            "location": {
+                "title": "Sensors Location",
+                "type": "string",
+                "value": ""
+            },
+            "description": {
+                "title": "Description/Information",
+                "type": "string",
+                "value": ""
+            },
+            "server": {
+                "title": "Server Address/URL",
+                "type": "string",
+                "value": ""
+            },
+            "username": {
+                "title": "DB Username",
+                "type": "string",
+                "value": ""
+            },
+            "password": {
+                "title": "DB Password",
+                "type": "string",
+                "value": ""
+            }
+        }
+    },
+    "sensors": { 
+        "title": "Sensors",
+        "type": "array",
+        "value": [{
+            "path": {
+                "title": "Sysfs path or ttyUSBX port (System will convert to sysfs path)",
+                "type": "string",
+                "value": ""
+            },
+            "baud_rate": {
+                "title": "Baud Rate",
+                "type": "integer",
+                "value": 9600
+            },
+            "name": {
+                "title": "Measurement Names (comma separated)",
+                "type": "string",
+                "value": ""
+            },
+            "wait_time": {
+                "title": "Waiting time between measurements (milliseconds)",
+                "type": "integer",
+                "value": 1100
+            },
+            "units": {
+                "title": "Measurement Units (comma separated)",
+                "type": "string",
+                "value": ""
+            },
+            "read_command": {
+                "title": "Read Command for this sensor",
+                "type": "string",
+                "value": ""
+            }
+        }]
+    }
+}
