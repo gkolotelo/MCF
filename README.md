@@ -16,9 +16,10 @@ Requirements
 ------------
 
 You will need the following packages:
-    python 2.7 or above
+
+python 2.7 or above
     
-    [pySerial](http://pyserial.sourceforge.net/)
+[pySerial](http://pyserial.sourceforge.net/)
     	
 
 Installation
