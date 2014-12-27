@@ -39,7 +39,7 @@ from serialsensor import *
 
 # Global Variables:
 # Version number
-version = "1.1 Build 7"
+version = "1.1 Build 8"
 # Variable to count the number of data points sent
 counter = 0
 # Board's hostname
@@ -52,6 +52,8 @@ old_log_path = base_path + 'old_log.log'
 config_path = base_path + 'config.json'
 # DB Client
 client = None
+# Settings
+settings = None
 
 
 # Initializes logger
@@ -93,16 +95,34 @@ if (os.getuid() != 0):
 def unhandled_exception_logger(_type, _value, _traceback):
     # Logs unhandled exceptions
     try:
+        settings['status']['value'] = "Exception"
+        saveSettingsToDB(settings, client, settings['_id'])
         uploadLog(client, log_path, settings['_id'])
     except:
-        logger.exception("Error uploading log:")
+        logger.exception("Error uploading log and settings:")
     logger.error("Uncaught unhandled exception: ", exc_info=(_type, _value, _traceback))
     print "Check errors in log"
-    sys.exit()
+    sys.exit(0)
 
 sys.excepthook = unhandled_exception_logger
 
 # Function definitions:
+
+
+def quit():
+    try:
+        settings['status']['value'] = "Stopped"
+    except:
+        pass
+    try:
+        saveSettingsToDB(settings, client, settings['_id'])
+        uploadLog(client, log_path, settings['_id'])
+    except:
+        try:
+            logger.exception("Error uploading log and settings:")
+        except:
+            pass
+    sys.exit(0)
 
 
 def now():
@@ -160,7 +180,7 @@ def initialize(path, hostname, version):
             db_settings = getSettingsFromDB(client, Id)
             if db_settings is None:
                 output("Problem Saving/Retrieving settings during initialization.", logger.error)
-                sys.exit(0)
+                quit()
             saveSettingsToFile(db_settings, config_path)
             output("Waiting for settings to be updated on the website, execution will resume once settings are updated...")
             new_settings = checkUpdates(db_settings, client, Id, config_path)
@@ -178,7 +198,12 @@ def initialize(path, hostname, version):
             settings = getSettingsFromDB(client, Id)  # get new _id
             saveSettingsToFile(settings, config_path)
 
+    settings['version']['value'] = version
+    settings['settings']['value']['hostname']['value'] = hostname
+    settings['ip']['value'] = ip_address
+    settings['status']['value'] = "Running"
     saveSettingsToFile(settings, path)
+    saveSettingsToDB(settings, client, settings['_id'])
 
     # Check and update hostname:
     if settings['settings']['value']['hostname']['value'] != hostname:
@@ -217,7 +242,7 @@ def mongoConnect(server, username="", password=""):
         return client
     except pymongo.errors.ConnectionFailure:
         output(('Could not connect to MongoDB at: "' + server + '"'), logger.error)
-        sys.exit(0)
+        quit()
 
 
 def insertData(data, client, settings):
@@ -355,6 +380,8 @@ def saveSettingsToDB(settings, client, Id):
         Id, if not already present on the database, inserting a new entry.
         None, if error while saving.
     """
+    if settings is None:
+        return None
     try:
         if Id is None:
             # New Board
@@ -388,11 +415,11 @@ def getSettingsFromFile(path):
     except IOError, e:
         if e.errno == 2:  # File not found
             output("Config file not found. Now exiting...")
-            sys.exit(0)
+            quit()
         else:
             output("Unknown error while opening config file.")
             raise
-            sys.exit(0)
+            quit()
 
 
 # Gets settings from database
@@ -432,7 +459,7 @@ def waitForInternet(wait):
         wait (int): Time to keep waiting for internet connection.
     """
     try:
-            urllib2.urlopen('8.8.8.8', timeout=5)  # Google's DNS server
+            urllib2.urlopen('http://74.125.228.100', timeout=5)  # Google
             output("Connection estabilished\n", logger.info)
     except urllib2.URLError:
         t = 0
@@ -446,7 +473,7 @@ def waitForInternet(wait):
                 time.sleep(10)
             t += 15
         output("No Connection, exiting...", logger.info)
-        sys.exit(0)
+        quit()
 
 
 def output(message, log_func=None, verbose=True):
@@ -486,7 +513,7 @@ def matchSerialPorts(settings, client, path):
     update = False
     if len(available_ports) == 0:
         output("No ports found. Now exiting.", logger.error)
-        sys.exit(0)
+        quit()
     ports = []
     syspaths = []
     for i in available_ports:
@@ -499,7 +526,7 @@ def matchSerialPorts(settings, client, path):
         if i['path']['value'] not in syspaths:
             # Check if path in the settings file doesn't exist in sysfs (syspaths)
             output("Not all sensors are connected, check connections and try again. Now exiting.", logger.error)
-            sys.exit(0)
+            quit()
     if update:
         #  Add syspaths to config file, and push to server:
         output("Updated syspaths", logger.info)
@@ -617,6 +644,8 @@ def instantiateSensors(sensors_list):
 def main():
     global counter
     global client
+    global settings
+
     time.sleep(10)
 
     # initialization routine, and get new settings and DB client
@@ -680,7 +709,7 @@ def main():
         if new_settings is not None:
             if new_settings is False:
                 # Settings has been deleted from server
-                sys.exit(0)
+                quit()
             return
 
         try:
@@ -693,7 +722,7 @@ def main():
             if JSON_readings == {} and counter > 2:
                 # If all sensors are disabled
                 output("No data being sent, exiting.", logger.error)
-                sys.exit(0)
+                quit()
             counter += 1
             JSON_readings['date'] = now()
             insertData(JSON_readings, client, settings)
@@ -759,8 +788,7 @@ def main():
                         output("Fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
                         output("Error cannot be fixed by reloading or rebooting. Check Board!")
                         output(e.SourceTraceback(), logger.error)
-                        uploadLog(client, log_path, settings['_id'])
-                        sys.exit(0)
+                        quit()
 
                     except:
                         output("Rebooting board, due to unhandled fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
@@ -787,15 +815,13 @@ def main():
                 except pymongo.errors.AutoReconnect, e:
                     if j == timeout:
                         output("Connection to database could not be restabilished. Now exiting...", logger.exception)
-                        raise
-                        sys.exit(0)  # Just in case raise doesn't raise
+                        quit()
                     time.sleep(30)
                 j += 1
 
         except KeyboardInterrupt, e:
             output("Manual quit", logger.error)
-            uploadLog(client, log_path, settings['_id'])
-            sys.exit(0)
+            quit()
 
         except:
             output("Unhandled Exception, non SerialError in main while loop, rebooting...", logger.exception)
@@ -810,6 +836,6 @@ if __name__ == '__main__':
     output("\n\nStarted execution:\n\n", logger.info)
     time.sleep(20)
     # Waits for internet connection (up to 3600 seconds), exits if not found.
-    waitForInternet(3600)
+    waitForInternet(60*60*5)
     while True:
         main()
