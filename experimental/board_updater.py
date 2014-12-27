@@ -5,7 +5,7 @@ import sys
 import paramiko
 
 # Boards:
-boards = ['water_sensors_2.media.mit.edu']
+boards = ['water_sensors_6.media.mit.edu']
           #,'water_sensors_2.media.mit.edu',
           #'water_sensors_3.media.mit.edu',
           #'water_sensors_4.media.mit.edu',

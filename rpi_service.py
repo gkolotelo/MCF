@@ -615,7 +615,7 @@ def instantiateSensors(sensors_list):
 def main():
     global counter
     global client
-    time.sleep(30)
+    time.sleep(10)
 
     # initialization routine, and get new settings and DB client
     settings, client = initialize(config_path, hostname, version)
@@ -803,7 +803,7 @@ def main():
 
 if __name__ == '__main__':
     output("\n\nStarted execution:\n\n", logger.info)
-
+    time.sleep(20)
     # Waits for internet connection (up to 3600 seconds), exits if not found.
     waitForInternet(3600)
     while True:

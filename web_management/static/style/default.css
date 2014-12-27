@@ -1,0 +1,39 @@
+.vCenter {
+    position: absolute;
+    height: 350px;
+    width: 100%;
+    top: 50%;
+    margin-top: -175px;
+    text-align: center;
+}
+.selections {
+    display: table;
+    margin: 0px;
+}
+.selection {
+    display: table-cell;
+    position: relative;
+    width: 200px;
+    height: 150px;
+    line-height: 150px;
+    border: 2px solid;
+    border-radius: 25px;
+}
+.space {
+    display: inline-block;
+    width: 25px;
+}
+.table-space {
+    display: table-cell;
+    width: 10px;
+}
+
+.form_sub_block {
+    display: block;
+    margin-left: 50px;
+}
+
+.form {
+    display: block;
+
+}

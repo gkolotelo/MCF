@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <title>{{ hostname }}</title> 
+        <script type="text/javascript" src="/static/lib/jquery/dist/jquery.min.js"></script>
+        <script type="text/javascript" src="/static/lib/bootstrap/dist/js/bootstrap.js"></script>
+        <link rel="stylesheet" href="/static/lib/bootstrap/dist/css/bootstrap.css">
+        <link rel="stylesheet" href="/static/style/default.css">
+        <script type="text/javascript" src="/static/lib/underscore/underscore.js"></script>
+        <script type="text/javascript" src="/static/lib/JSV/lib/jsv.js"></script>
+        <script type="text/javascript" src="/static/lib/jsonform/lib/jsonform.js"></script>
+        <script type="text/javascript">
+                String.prototype.toTitle = function () {
+                    a = this.replace("_"," ");
+                    return a.replace(/\w\S*/g, function(txt){return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();});
+                };
+                function _jsonform_fix_array_buttons() {
+                    $('._jsonform-array-addmore').addClass('btn-default');
+                    $('.icon-plus-sign').addClass('glyphicon')
+                                        .addClass('glyphicon-plus-sign');
+                    $('._jsonform-array-deletelast').addClass('btn-default');
+                    $('.icon-minus-sign').addClass('glyphicon')
+                                         .addClass('glyphicon-minus-sign');
+                    $('._jsonform-array-buttons').css('display', 'inline-block');
+                    $('._jsonform-array-buttons').css('margin-bottom', 10);
+                }
+                function DELETEBOARD() {
+                    if (confirm('Are you sure you want to delete this board? Settings and log will be removed from server.')) {
+                        $.get(location.pathname + "?DELETEBOARD=True");
+                        window.location.href = "/";
+                    }
+                    else return;
+                }
+                var datum;
+                $(function() {
+                    $.get(location.pathname + "schema", function(data){
+                        datum = JSON.parse(data);
+                        datum["onSubmit"] = function (errors, values) {
+                            console.log(values);
+                            console.log(errors);
+                            console.log(form);
+                            if(typeof values.sensors === 'undefined'){
+                                    alert('At least one sensor must be defined!');
+                                    return;
+                            }
+                            $.post(location.pathname, values, function() {location.reload();});
+                        }
+                        //datum["params"] = {
+                        //    "fieldHtmlClass": "form-control"
+                        //}
+                        console.log(datum);
+                        $('form').jsonForm(datum)
+                        $('form').css('display', 'none');
+                        $('form').fadeIn();
+                        _jsonform_fix_array_buttons();
+                    });
+                });
+        </script>
+    </head>
+    <body>
+        <div class="container">
+            <div class="page-header" style="width: 100%;">
+                <a href="/" class="btn btn-primary btn-default" role="button" style="display: inline-block; margin-right: 40px; margin-left:-102px;vertical-align: middle; margin-top: 10px">Back</a>
+                <h1 style="display: inline-block;vertical-align: middle">
+                    Edit settings for <i>{{ hostname }} @ {{ collection_name }}</i>
+                </h1>
+            </div>
+            <div style="display: table; width: 100%; height:65px">
+                <div style="display: inline-block; width: 45%; text-align: left; vertical-align: middle;">
+                    <h5>
+                        IP Address: {{ ip }}<br>
+                        Software version: {{ version }}<br>
+                        Last Change: {{ change_date }}<br>
+                        ID: {{ _id }}<br>
+                        Status: {{ status }}
+                    </h5>
+                </div>
+                <div style="display: inline-block; text-align: left; vertical-align: middle; float: right">
+                        <a href="/boards/{{ _id }}/log" class="btn btn-primary btn-xs" role="button"><h5>View Log</h5></a>
+                        <!--<a href="/boards/{{ _id }}/advanced" class="btn btn-primary btn-xs" role="button"><h5>Change Advanced Settings</h5></a>-->
+                    <a href="javascript:DELETEBOARD();" class="btn btn-danger btn-xs" id="reset" role="button"><h5>Delete Board</h5></a>
+                </div>
+            </div>
+            <div id="form">
+                <form></form>
+            </div>
+            <footer style="margin: 40px 0px" id="bottom">
+                <a href="javascript:$('html, body').animate({scrollTop:0}, 400);" class="btn btn-primary btn-default" role="button"><span class="glyphicon glyphicon-chevron-up"></span></a>
+            </footer>
+        </div>
+    </body>
+</html>
