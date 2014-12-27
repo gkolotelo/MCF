@@ -51,7 +51,7 @@ while True:
     print "Type sensor number, and press enter to enter commands to that sensor. When done press ctrl-c to be done with that sensor"
     print "press enter to exit"
     print "\nAvailable sensors:"
-    for i in sensors: 
+    for i in sensors:
         print "({})".format(sensors.index(i)), i.getName(), '@', i.getPort(), "units:", i.getUnits()
     try:
         sensor = raw_input("Enter asensor number: ")
@@ -60,7 +60,7 @@ while True:
             while sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
                 line = sys.stdin.readline()
                 if line:
-                    sensors[int(sensor)].send(line)
+                    sensors[int(sensor)].send(line.replace('\n', ''))
             try:
                 print sensors[int(sensor)].readRaw()
             except SerialError, e:
