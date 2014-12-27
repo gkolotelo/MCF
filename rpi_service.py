@@ -1,6 +1,6 @@
 #!/usr/bin/python2
 """
-Sensor Reader Script 1.1 Build 2
+Sensor Reader Script
 
 Script to retrieve data from serial sensors and storing onto MongoDB databases.
 Support for web management, and headless deployment.
@@ -39,7 +39,7 @@ from serialsensor import *
 
 # Global Variables:
 # Version number
-version = "1.1 Build 2"
+version = "1.1 Build 5"
 # Variable to count the number of data points sent
 counter = 0
 # Board's hostname
@@ -59,9 +59,15 @@ def initialize_logger(log_path, old_log_path):
     # Try to find current log, if found, append to old_log
     try:
         with open(log_path, 'r+') as curr_log:
-            with open(old_log_path, 'a+') as old_log:
-                old_log.writelines(curr_log.read())
-            curr_log.truncate(0)
+            log = curr_log.read()
+            if log.count('Started execution:') >= 2:  # If there's only 1 or less logs, do nothing
+                l1st = log.rfind('Started execution:')  # 1st log log[last occurence of 'Started exec...':EOF]
+                with open(old_log_path, 'a+') as old_log:
+                    old_log.writelines(log[:l1st])  # Append everything up to the 1st log
+        f = open(log_path, 'w+')
+        f.writelines(log[l1st:])
+        f.close
+        del log
     except:
         pass
     logger = logging.getLogger(__name__)
@@ -275,14 +281,17 @@ def checkUpdates(current_settings, client, Id, path):
         # Could not retrieve settings from db, deleted?
         output("Problem retrieving settings from DB. Board may have been deleted from server", logger.error)
         return False
-    # if time.strptime(getSettingsFromDB(client)['changes']['date'], "%d/%m/%y %I:%M:%S%p") > time.strptime(getSettingsFromFile(path)['changes']['date'],"%d/%m/%y %I:%M:%S%p"):
-    if current_settings['changes']['date'] < db_settings['changes']['date']:
-        output("New settings found on DB, updating...", logger.info)
-        saveSettingsToFile(db_settings, path)
-        # updateSettings(db_settings)  # settings is now equal to db_setings
-        output("New settings updated.", logger.info)
-        return db_settings
-    return None
+    try:
+        if time.strptime(current_settings['changes']['date'], "%m/%d/%y %I:%M:%S%p") < time.strptime(db_settings['changes']['date'], "%m/%d/%y %I:%M:%S%p"):
+            output("New settings found on DB, updating...", logger.info)
+            saveSettingsToFile(db_settings, path)
+            # updateSettings(db_settings)  # settings is now equal to db_setings
+            output("New settings updated.", logger.info)
+            return db_settings
+        return None
+    except ValueError:
+        # Date is ""
+        return None
 
 
 # Upload log file to server
@@ -425,15 +434,16 @@ def waitForInternet(wait):
             urllib2.urlopen('http://www.google.com', timeout=5)  # change this to connect to server (if on intranet)
             output("Connection estabilished\n", logger.info)
     except urllib2.URLError:
-        t = time.time()
+        t = 0
         output("Waiting up to: " + str(wait) + " seconds for connection...", logger.info)
-        while (time.time() - t) < wait:
+        while t < wait:
             try:
                 urllib2.urlopen('http://www.google.com', timeout=5)  # change this to connect to server (if on intranet)
                 output("Connection estabilished", logger.info)
                 return
             except urllib2.URLError:
                 time.sleep(10)
+            t += 15
         output("No Connection, exiting...", logger.info)
         sys.exit(0)
 
@@ -605,43 +615,57 @@ def instantiateSensors(sensors_list):
 def main():
     global counter
     global client
+    time.sleep(30)
 
     # initialization routine, and get new settings and DB client
     settings, client = initialize(config_path, hostname, version)
-    # log settings
-    printout = '\nVersion:                  ' + version + \
-               '\nStatus:                   ' + settings['status']['value'] + \
-               '\nDescription:              ' + settings['settings']['value']['description']['value'] + \
-               '\nLocation:                 ' + settings['settings']['value']['location']['value'] + \
-               '\nHostname:                 ' + hostname + \
-               '\nIP Address:               ' + ip_address + \
-               '\nID:                       ' + str(settings['_id']) + \
-               '\nLast updated settings:    ' + settings['changes']['date'] + \
-               '\n\nUsing settings:\n' + \
-               '\nServer:                   ' + settings['settings']['value']['server']['value'] + \
-               '\nDB name:                  ' + settings['settings']['value']['db_name']['value'] + \
-               '\nCollection name:          ' + settings['settings']['value']['collection_name']['value'] + \
-               '\nFrequency (seconds):      ' + settings['settings']['value']['sensor_reading_frequency']['value'] + '\n'
-    output(printout, logger.info)
-    del printout
 
-    # Find and match serial ports:
-    matchSerialPorts(settings, client, config_path)
+    try:
+        # log settings
+        printout = '\nVersion:                  ' + version + \
+                   '\nStatus:                   ' + settings['status']['value'] + \
+                   '\nDescription:              ' + settings['settings']['value']['description']['value'] + \
+                   '\nLocation:                 ' + settings['settings']['value']['location']['value'] + \
+                   '\nHostname:                 ' + hostname + \
+                   '\nIP Address:               ' + ip_address + \
+                   '\nID:                       ' + str(settings['_id']) + \
+                   '\nLast updated settings:    ' + settings['changes']['date'] + \
+                   '\n\nUsing settings:\n' + \
+                   '\nServer:                   ' + settings['settings']['value']['server']['value'] + \
+                   '\nDB name:                  ' + settings['settings']['value']['db_name']['value'] + \
+                   '\nCollection name:          ' + settings['settings']['value']['collection_name']['value'] + \
+                   '\nFrequency (seconds):      ' + settings['settings']['value']['sensor_reading_frequency']['value'] + '\n'
+        output(printout, logger.info)
+        del printout
 
-    # If all sensors from settings found, continue:
-    sensors = instantiateSensors(settings['sensors']['value'])
+        # Find and match serial ports:
+        matchSerialPorts(settings, client, config_path)
 
-    # Display initialized sensors
-    output("Available sensors:", logger.info)
-    for i in sensors:
-        output(i.getName() + ' @ ' + i.getPort() + " , Units: " +
-               i.getUnits() + " , Waiting time: " + str(i.getWaitTime()) + 'ms', logger.info)
 
-    output("Data points to date: " +
-           str(client[settings['settings']['value']['db_name']['value']]
-               [settings['settings']['value']['collection_name']['value']].count()), logger.info)
+        try:
+            # If all sensors from settings found, continue:
+            sensors = instantiateSensors(settings['sensors']['value'])
+        except SerialError, e:
+            if e.errno == 5:
+                output("Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
+                uploadLog(client, log_path, settings['_id'])
+                os.system("systemctl reboot")
+                sys.exit(0)
 
-    output("Reading Started...", logger.info)
+
+        # Display initialized sensors
+        output("Available sensors:", logger.info)
+        for i in sensors:
+            output(i.getName() + ' @ ' + i.getPort() + " , Units: " +
+                   i.getUnits() + " , Waiting time: " + str(i.getWaitTime()) + 'ms', logger.info)
+
+        output("Data points to date: " +
+               str(client[settings['settings']['value']['db_name']['value']]
+                   [settings['settings']['value']['collection_name']['value']].count()), logger.info)
+
+        output("Reading Started...", logger.info)
+    finally:
+        uploadLog(client, log_path, settings['_id'])
 
     # End of initialization
     # Start reading:
@@ -686,12 +710,13 @@ def main():
 
         except SerialError, e:
             output(e, logger.error)
-            logger.exception("The previous error was due to the following exception:")
+            output("The previous error was due to the following exception:", logger.error)
+            output(e.SourceTraceback(), logger.error)
             try:
                 i.read()
                 output("No problems found", logger.info)
             except SerialError, e:
-                for j in xrange(4):
+                for j in xrange(3):
                     try:
                         i.close()
                         i.open()
@@ -699,18 +724,42 @@ def main():
                         break
                     except:
                         logger.exception("Exception occured during #" + str(j) + " trial.")
-                        time.sleep(1)
-                if j >= 3:  # If exhausted trials
+                        time.sleep(0.4)
+                if j >= 2:  # If exhausted trials
                     try:
                         i.close()
                         i.open()
                         i.read()
                     except SerialError, e:
                         if e.errno == 5:
-                            output("Reloading sensors due to exception in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
+                            if i.getPort() != getTTYFromPath(getSysPathFromTTY(i.getPort())):
+                                print "Ports are different!"  # For debugging, remove.
+                                output("\n\nReloading sensors due to exception in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno) + "\n\n", logger.error)
+                                output(e.SourceTraceback(), logger.error)
+                                uploadLog(client, log_path, settings['_id'])
+                                return
+                            else:
+                                output("Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
+                                output("The previous error was due to the following exception:", logger.error)
+                                output(e.SourceTraceback(), logger.error)
+                                uploadLog(client, log_path, settings['_id'])
+                                os.system("systemctl reboot")
+                                sys.exit(0)
+                        if e.errno == 0:
+                            output("\n\nReloading sensors due to exception in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno) + "\n\n", logger.error)
+                            output(e.SourceTraceback(), logger.error)
+                            uploadLog(client, log_path, settings['_id'])
                             return
+
+                        output("Fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
+                        output("Error cannot be fixed by reloading or rebooting. Check Board!")
+                        output(e.SourceTraceback(), logger.error)
+                        uploadLog(client, log_path, settings['_id'])
+                        sys.exit(0)
+
                     except:
-                        output("Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
+                        output("Rebooting board, due to unhandled fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
+                        logger.exception("Unhandled Exception:")
                         uploadLog(client, log_path, settings['_id'])
                         os.system("systemctl reboot")
                         sys.exit(0)
@@ -748,7 +797,6 @@ def main():
             uploadLog(client, log_path, settings['_id'])
             os.system("systemctl reboot")
             sys.exit(0)
-
         finally:
             uploadLog(client, log_path, settings['_id'])
 

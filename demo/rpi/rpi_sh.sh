@@ -1,3 +1,3 @@
 #!/bin/bash
 
-/root/rpi/rpi_service.py
+/root/RPi/rpi_service.py
