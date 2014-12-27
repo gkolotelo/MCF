@@ -39,7 +39,7 @@ from serialsensor import *
 
 # Global Variables:
 # Version number
-version = "1.1 Build 6"
+version = "1.1 Build 7"
 # Variable to count the number of data points sent
 counter = 0
 # Board's hostname
@@ -64,10 +64,10 @@ def initialize_logger(log_path, old_log_path):
                 l1st = log.rfind('Started execution:')  # 1st log log[last occurence of 'Started exec...':EOF]
                 with open(old_log_path, 'a+') as old_log:
                     old_log.writelines(log[:l1st])  # Append everything up to the 1st log
-        f = open(log_path, 'w+')
-        f.writelines(log[l1st:])
-        f.close
-        del log
+                f = open(log_path, 'w+')
+                f.writelines(log[l1st:])
+                f.close
+            del log
     except:
         pass
     logger = logging.getLogger(__name__)
@@ -95,7 +95,7 @@ def unhandled_exception_logger(_type, _value, _traceback):
     try:
         uploadLog(client, log_path, settings['_id'])
     except:
-        output("Error uploading log", logger.error)
+        logger.exception("Error uploading log:")
     logger.error("Uncaught unhandled exception: ", exc_info=(_type, _value, _traceback))
     print "Check errors in log"
     sys.exit()
@@ -282,16 +282,17 @@ def checkUpdates(current_settings, client, Id, path):
         output("Problem retrieving settings from DB. Board may have been deleted from server", logger.error)
         return False
     try:
-        if time.strptime(current_settings['changes']['date'], "%m/%d/%y %I:%M:%S%p") < time.strptime(db_settings['changes']['date'], "%m/%d/%y %I:%M:%S%p"):
-            output("New settings found on DB, updating...", logger.info)
-            saveSettingsToFile(db_settings, path)
-            # updateSettings(db_settings)  # settings is now equal to db_setings
-            output("New settings updated.", logger.info)
-            return db_settings
-        return None
-    except ValueError:
-        # Date is ""
-        return None
+        curr_date = time.strptime(current_settings['changes']['date'], "%m/%d/%y %I:%M:%S%p")
+    except:
+        curr_date = 0
+    if curr_date < time.strptime(db_settings['changes']['date'], "%m/%d/%y %I:%M:%S%p"):
+        output("New settings found on DB, updating...", logger.info)
+        saveSettingsToFile(db_settings, path)
+        # updateSettings(db_settings)  # settings is now equal to db_setings
+        output("New settings updated.", logger.info)
+        return db_settings
+    return None
+
 
 
 # Upload log file to server
@@ -431,7 +432,7 @@ def waitForInternet(wait):
         wait (int): Time to keep waiting for internet connection.
     """
     try:
-            urllib2.urlopen('http://www.google.com', timeout=5)  # change this to connect to server (if on intranet)
+            urllib2.urlopen('8.8.8.8', timeout=5)  # Google's DNS server
             output("Connection estabilished\n", logger.info)
     except urllib2.URLError:
         t = 0
@@ -708,7 +709,8 @@ def main():
                       more than defined reading frequency. Make necessary adjustments.", logger.info)
 
         except SerialError, e:
-            output("\n\n" + repr(e), logger.error)
+            output("\n\n", logger.error)
+            output(e, logger.error)
             output("The previous error was due to the following exception:", logger.error)
             output(e.SourceTraceback(), logger.error)
             try:
@@ -731,7 +733,11 @@ def main():
                         i.read()
                     except SerialError, e:
                         if e.errno == 5:
-                            if i.getPort() != getTTYFromPath(getSysPathFromTTY(i.getPort())):
+                            try:
+                                res = i.getPort() != getTTYFromPath(getSysPathFromTTY(i.getPort()))
+                            except:
+                                res = False
+                            if res:
                                 print "Ports are different!"  # For debugging, remove.
                                 output("\n\nReloading sensors due to exception in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno) + "\n\n", logger.error)
                                 output(e.SourceTraceback(), logger.error)
