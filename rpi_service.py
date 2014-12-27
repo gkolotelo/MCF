@@ -495,7 +495,8 @@ def matchSerialPorts(settings, client, path):
         if i['path']['value'].strip().find('/dev/') == 0:  # If starts with /dev/ must be /dev/ttyUSBx
             settings['sensors']['value'][settings['sensors']['value'].index(i)]['path']['value'] = getSysPathFromTTY(i['path']['value'])
             update = True
-        if i['path']['value'] not in syspaths:  # Check if path in the settings file doesn't exist in sysfs (syspaths)
+        if i['path']['value'] not in syspaths:
+            # Check if path in the settings file doesn't exist in sysfs (syspaths)
             output("Not all sensors are connected, check connections and try again. Now exiting.", logger.error)
             sys.exit(0)
     if update:
@@ -641,7 +642,6 @@ def main():
         # Find and match serial ports:
         matchSerialPorts(settings, client, config_path)
 
-
         try:
             # If all sensors from settings found, continue:
             sensors = instantiateSensors(settings['sensors']['value'])
@@ -651,7 +651,6 @@ def main():
                 uploadLog(client, log_path, settings['_id'])
                 os.system("systemctl reboot")
                 sys.exit(0)
-
 
         # Display initialized sensors
         output("Available sensors:", logger.info)
