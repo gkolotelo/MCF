@@ -39,7 +39,7 @@ from serialsensor import *
 
 # Global Variables:
 # Version number
-version = "1.1 Build 5"
+version = "1.1 Build 6"
 # Variable to count the number of data points sent
 counter = 0
 # Board's hostname
@@ -708,7 +708,7 @@ def main():
                       more than defined reading frequency. Make necessary adjustments.", logger.info)
 
         except SerialError, e:
-            output(e, logger.error)
+            output("\n\n" + e, logger.error)
             output("The previous error was due to the following exception:", logger.error)
             output(e.SourceTraceback(), logger.error)
             try:
