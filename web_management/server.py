@@ -25,8 +25,8 @@ from bson.objectid import ObjectId
 
 # Connect to MongoDB
 try:
-    client = pymongo.MongoClient("")
-    client.admin.authenticate("", "")
+    client = pymongo.MongoClient("cityfarm.media.mit.edu")
+    client.admin.authenticate("admin", "cityfarm")
     board_collection = client['admin']['boards']  # Default DB and collection for storing board settings
     log_collection = client['admin']['log']  # Default DB and collection for storing logs
     # Note that logs and settings are stored with the same ObjectId, which also corresponds to the board's Id
