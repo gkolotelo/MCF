@@ -745,7 +745,7 @@ def main():
                 i.read()
                 output("No problems found", logger.info)
             except SerialError, e:
-                for j in xrange(3):
+                for j in xrange(4):
                     try:
                         i.close()
                         i.open()
@@ -754,7 +754,7 @@ def main():
                     except:
                         logger.exception("Exception occured during #" + str(j) + " trial.")
                         time.sleep(0.4)
-                if j >= 2:  # If exhausted trials
+                if j >= 3:  # If exhausted trials
                     try:
                         i.close()
                         i.open()
@@ -778,14 +778,14 @@ def main():
                                 uploadLog(client, log_path, settings['_id'])
                                 os.system("systemctl reboot")
                                 sys.exit(0)
-                        if e.errno == 0:
+                        if e.errno == 0 or e.errno == 3:
                             output("\n\nReloading sensors due to exception in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno) + "\n\n", logger.error)
                             output(e.SourceTraceback(), logger.error)
                             uploadLog(client, log_path, settings['_id'])
                             return
 
                         output("Fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
-                        output("Error cannot be fixed by reloading or rebooting. Check Board!")
+                        output("Error cannot be fixed by reloading or rebooting. Check Board!", logger.error)
                         output(e.SourceTraceback(), logger.error)
                         quit()
 

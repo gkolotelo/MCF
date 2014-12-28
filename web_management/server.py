@@ -21,8 +21,8 @@ from bson.objectid import ObjectId
 
 # Connect to MongoDB
 try:
-    client = pymongo.MongoClient("cityfarm.media.mit.edu")
-    client.admin.authenticate("admin", "cityfarm")
+    client = pymongo.MongoClient("")
+    client.admin.authenticate("", "")
     board_collection = client['admin']['boards']  # Default DB and collection for storing board settings
     log_collection = client['admin']['log']  # Default DB and collection for storing logs
     # Note that logs and settings are stored with the same ObjectId, which also corresponds to the board's Id
@@ -54,11 +54,13 @@ def board_selection():
         }
         db_names[i['settings']['value']['db_name']['value']].update(ids)
     # format: db_names = {db_1: {collection_1:{collection_1, hostname, _id}, ...}, ...}
+    def getKey(item):
+        return db_names[db][item]['hostname']
     ordered_dbs = collections.OrderedDict()  # Empty OrderedDict
     for db in sorted(db_names):
         # Create empty OrderedDicts for each board in a specific db
         ordered_dbs[db] = collections.OrderedDict()
-        for _id_ in sorted(db_names[db]):
+        for _id_ in sorted(db_names[db], key=getKey):
             ordered_dbs[db].update({_id_: db_names[db][_id_]})
     #print json_util.dumps(ordered_dbs.iteritems())
     return render_template("selection.html", dbs=ordered_dbs)

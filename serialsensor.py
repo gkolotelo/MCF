@@ -319,7 +319,9 @@ class SerialSensor:
     def open(self):
         try:
             self.__connection.open()
-            time.sleep(0.2)
+            time.sleep(0.1)
+            self.__connection.flushInput()
+            time.sleep(0.1)
         except SerialException, e:
             raise SerialError("Could not connect to serial device -> SerialException.", self.__name, self.__serial_port, 0, 'open()', e.message, source_exc_info=sys.exc_info())
         except termios.error:

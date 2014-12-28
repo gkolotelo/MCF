@@ -2,7 +2,7 @@
 """
 CityFARM Image Preparation Utility
 
-image_utility [--water] [--air] [--no-burn] [--no-unmount] SOURCE_IMAGE [TARGET_DISK]
+image_utility [--water] [--air] [--no-burn] [--no-unmount] [--only-burn] SOURCE_IMAGE [TARGET_DISK]
 
 Options:
     --air
