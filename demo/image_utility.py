@@ -81,7 +81,7 @@ Instructions:
         The server address (URL or IP Address) in hands, as well as the username and password
         of the database.
 
-    4.  
+    4.
         If you have ALL the items above, you can proceed to burning your image
         into the SD Card. To do that, follow the instructions below:
 
@@ -100,7 +100,7 @@ Instructions:
             image_utility TARGET_DISK SOURCE_IMAGE [ADDITIONAL_FILES]...
 
                 user$: ./image_utility.py /dev/sdb archlinux_cityfarm_image_3_12_34_ARCH.img
-            
+
             Or with additional files:
 
                 user$: ./image_utility.py /dev/sdb archlinux_cityfarm_image_3_12_34_ARCH.img whatever_file.txt
@@ -178,8 +178,7 @@ if str(args).find("--no-unmount") != -1:
 if no_burn is False:
     if not any("/dev/" in s for s in args):
         print "TARGET_DISK not set or invalid TARGET_DISK."
-        #sys.exit(0)
-
+        sys.exit(0)
 
 
 def main():
@@ -192,7 +191,7 @@ def main():
         target_disk = args[len(args)-1]
         if target_disk.find('/dev/') == -1:
             print "TARGET_DISK not set or invalid TARGET_DISK."
-            #sys.exit(0)
+            sys.exit(0)
         print "Target Disk:  " + target_disk
     if source_image.find('.img') == -1:
             print "SOURCE_IMAGE not set or inavlid SOURCE_IMAGE."
