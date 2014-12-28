@@ -153,10 +153,16 @@ def initialize(path, hostname, version):
         (settings, client) tuple. With the settings file to be used, and the DB client
     """
     file_settings = getSettingsFromFile(path)  # Get username, password and server
-    client = mongoConnect(file_settings['settings']['value']['server']['value'],
-                          username=file_settings['settings']['value']['username']['value'],
-                          password=file_settings['settings']['value']['password']['value']
-                          )
+    for j in xrange(5):
+        try:
+            client = mongoConnect(file_settings['settings']['value']['server']['value'],
+                                  username=file_settings['settings']['value']['username']['value'],
+                                  password=file_settings['settings']['value']['password']['value']
+                                  )
+            output("Trying again.", logger.error)
+            break
+        except:
+            pass
     try:
         Id = file_settings['_id']
     except KeyError:
@@ -242,7 +248,7 @@ def mongoConnect(server, username="", password=""):
         return client
     except pymongo.errors.ConnectionFailure:
         output(('Could not connect to MongoDB at: "' + server + '"'), logger.error)
-        quit()
+        raise
 
 
 def insertData(data, client, settings):
@@ -752,7 +758,8 @@ def main():
                         i.read()
                         break
                     except:
-                        logger.exception("Exception occured during #" + str(j) + " trial.")
+                        output("Exception occured during #" + str(j) + " trial:")
+                        output(e.SourceTraceback(), logger.error)
                         time.sleep(0.4)
                 if j >= 3:  # If exhausted trials
                     try:
@@ -760,6 +767,7 @@ def main():
                         i.open()
                         i.read()
                     except SerialError, e:
+                        output("Exhausted trials:")
                         if e.errno == 5:
                             try:
                                 res = i.getPort() != getTTYFromPath(getSysPathFromTTY(i.getPort()))
