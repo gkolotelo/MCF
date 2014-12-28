@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # General Imports
 import collections
 import json
@@ -10,7 +12,9 @@ from flask import request
 from flask import render_template
 from flask import jsonify
 from flask import abort
-app = Flask(__name__)
+from flask import Blueprint
+bp = Blueprint("web_management", __name__, template_folder="templates",
+               static_folder="static")
 boards = {}
 
 # Mongo Imports
@@ -21,8 +25,8 @@ from bson.objectid import ObjectId
 
 # Connect to MongoDB
 try:
-    client = pymongo.MongoClient("cityfarm.media.mit.edu")
-    client.admin.authenticate("admin", "cityfarm")
+    client = pymongo.MongoClient("")
+    client.admin.authenticate("", "")
     board_collection = client['admin']['boards']  # Default DB and collection for storing board settings
     log_collection = client['admin']['log']  # Default DB and collection for storing logs
     # Note that logs and settings are stored with the same ObjectId, which also corresponds to the board's Id
@@ -32,11 +36,11 @@ except pymongo.errors.ConnectionFailure:
 
 # Routes:
 
-@app.route("/", methods=['GET'])
+@bp.route("/", methods=['GET'])
 def board_selection():
     cursor = board_collection.find()
     if cursor.count() == 0:
-        return render_template("selection.html", dbs={})
+        return render_template("web_management/selection.html", dbs={})
     db_names = {}
     for i in cursor:
         try:
@@ -63,10 +67,10 @@ def board_selection():
         for _id_ in sorted(db_names[db], key=getKey):
             ordered_dbs[db].update({_id_: db_names[db][_id_]})
     #print json_util.dumps(ordered_dbs.iteritems())
-    return render_template("selection.html", dbs=ordered_dbs)
+    return render_template("web_management/selection.html", dbs=ordered_dbs)
 
 
-@app.route("/boards/<Id>/", methods=['GET', 'POST'])
+@bp.route("/boards/<Id>/", methods=['GET', 'POST'])
 def board_menu(Id):
     board_info = findBoardById(Id)
     if board_info is None:
@@ -91,7 +95,7 @@ def board_menu(Id):
         except:
             pass
     else:
-        return render_template("dashboard.html",
+        return render_template("web_management/dashboard.html",
                                collection_name=board_info['settings']['value']['collection_name']['value'],
                                hostname=board_info['settings']['value']['hostname']['value'],
                                ip=board_info['ip']['value'],
@@ -101,13 +105,13 @@ def board_menu(Id):
                                status=board_info['status']['value'])
 
 
-@app.route("/boards/<Id>/log/", methods=['GET'])
+@bp.route("/boards/<Id>/log/", methods=['GET'])
 def board_log(Id):
     board_info = findLogById(Id)
     if board_info is None:
         return abort(404)
     log_str = board_info['contents'].replace('"', "'").replace('\n', '<br>')
-    return render_template("logs.html",
+    return render_template("web_management/logs.html",
                            log_file=log_str[:-1],
                            collection_name=board_info['settings']['value']['collection_name']['value'],
                            hostname=board_info['settings']['value']['hostname']['value'],
@@ -118,7 +122,7 @@ def board_log(Id):
                            status=board_info['status']['value'])
 
 
-# @app.route("/boards/<Id>/advanced/", methods=['GET', 'POST'])
+# @bp.route("/boards/<Id>/advanced/", methods=['GET', 'POST'])
 # def board_menu_advanced(Id):
 #     board_info = findBoardById(Id)
 #     if board_info == None:
@@ -147,7 +151,7 @@ def board_log(Id):
 #             pass
 #
 #     else:
-#         return render_template("dashboard.html",
+#         return render_template("web_management/dashboard.html",
 #                                collection_name=board_info['settings']['value']['collection_name']['value'],
 #                                hostname=board_info['settings']['value']['hostname']['value'],
 #                                ip=board_info['ip']['value'],
@@ -158,7 +162,7 @@ def board_log(Id):
 
 
 # JSON get requests:
-@app.route('/boards/<Id>/schema/')
+@bp.route('/boards/<Id>/schema/')
 def board_schema_json(Id):
     board_info = findBoardById(Id)
     if board_info is None:
@@ -167,7 +171,7 @@ def board_schema_json(Id):
     return json.dumps(build_schema_board(board_info))
 
 
-@app.route('/boards/<Id>/advanced/schema/')
+@bp.route('/boards/<Id>/advanced/schema/')
 def board_schema_json_adv(Id):
     board_info = findBoardById(Id)
     if board_info is None:
@@ -388,6 +392,7 @@ def updateBoardById(Id, data):
         return False
     return True
 
-
 if __name__ == '__main__':
+    app = Flask(__name__)
+    app.register_blueprint(bp)
     app.run(debug=True)

@@ -2,14 +2,14 @@
 <html lang="en">
     <head>
         <meta charset="utf-8" />
-        <title>{{ hostname }}</title> 
-        <script type="text/javascript" src="/static/lib/jquery/dist/jquery.min.js"></script>
-        <script type="text/javascript" src="/static/lib/bootstrap/dist/js/bootstrap.js"></script>
-        <link rel="stylesheet" href="/static/lib/bootstrap/dist/css/bootstrap.css">
-        <link rel="stylesheet" href="/static/style/default.css">
-        <script type="text/javascript" src="/static/lib/underscore/underscore.js"></script>
-        <script type="text/javascript" src="/static/lib/JSV/lib/jsv.js"></script>
-        <script type="text/javascript" src="/static/lib/jsonform/lib/jsonform.js"></script>
+        <title>{{ hostname }}</title>
+        <script type="text/javascript" src="{{ url_for('web_management.static', filename='lib/jquery/dist/jquery.min.js') }}"></script>
+        <script type="text/javascript" src="{{ url_for('web_management.static', filename='lib/bootstrap/dist/js/bootstrap.js') }}"></script>
+        <link rel="stylesheet" href="{{ url_for('web_management.static', filename='lib/bootstrap/dist/css/bootstrap.css') }}">
+        <link rel="stylesheet" href="{{ url_for('web_management.static', filename='style/default.css') }}">
+        <script type="text/javascript" src="{{ url_for('web_management.static', filename='lib/underscore/underscore.js') }}"></script>
+        <script type="text/javascript" src="{{ url_for('web_management.static', filename='lib/JSV/lib/jsv.js') }}"></script>
+        <script type="text/javascript" src="{{ url_for('web_management.static', filename='lib/jsonform/lib/jsonform.js') }}"></script>
         <script type="text/javascript">
                 String.prototype.toTitle = function () {
                     a = this.replace("_"," ");
@@ -77,8 +77,7 @@
                     </h5>
                 </div>
                 <div style="display: inline-block; text-align: left; vertical-align: middle; float: right">
-                        <a href="./log" class="btn btn-primary btn-xs" role="button"><h5>View Log</h5></a>
-                        <!--<a href="/boards/{{ _id }}/advanced" class="btn btn-primary btn-xs" role="button"><h5>Change Advanced Settings</h5></a>-->
+                        <a href="log" class="btn btn-primary btn-xs" role="button"><h5>View Log</h5></a>
                     <a href="javascript:DELETEBOARD();" class="btn btn-danger btn-xs" id="reset" role="button"><h5>Delete Board</h5></a>
                 </div>
             </div>
