@@ -39,7 +39,7 @@ from serialsensor import *
 
 # Global Variables:
 # Version number
-version = "1.1 Build 9"
+version = "1.1 Build 10"
 # Variable to count the number of data points sent
 counter = 0
 # Board's hostname
@@ -159,9 +159,9 @@ def initialize(path, hostname, version):
                                   username=file_settings['settings']['value']['username']['value'],
                                   password=file_settings['settings']['value']['password']['value']
                                   )
-            output("Trying again.", logger.error)
             break
         except:
+            output("Trying again.", logger.error)
             pass
     try:
         Id = file_settings['_id']
