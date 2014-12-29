@@ -153,7 +153,7 @@ def initialize(path, hostname, version):
         (settings, client) tuple. With the settings file to be used, and the DB client
     """
     file_settings = getSettingsFromFile(path)  # Get username, password and server
-    for j in xrange(5):
+    for j in xrange(3*60*60/15):
         try:
             client = mongoConnect(file_settings['settings']['value']['server']['value'],
                                   username=file_settings['settings']['value']['username']['value'],
@@ -161,8 +161,13 @@ def initialize(path, hostname, version):
                                   )
             break
         except:
-            output("Trying again.", logger.error)
-            pass
+            if j >= 3*60*60/15 - 1:
+                output("Could not connect to DB.", logger.error)
+                sys.exit(0)  # Don't bother with quit(), no connection anyway
+            else:
+                output("Trying again in 15 seconds.", logger.error)
+            time.sleep(15)
+
     try:
         Id = file_settings['_id']
     except KeyError:
@@ -476,7 +481,7 @@ def waitForInternet(wait):
         output("Waiting up to: " + str(wait) + " seconds for connection...", logger.info)
         while t < wait:
             try:
-                urllib2.urlopen('http://www.google.com', timeout=5)  # change this to connect to server (if on intranet)
+                urllib2.urlopen('http://74.125.228.100', timeout=5)  # change this to connect to server (if on intranet)
                 output("Connection estabilished", logger.info)
                 return
             except urllib2.URLError:
