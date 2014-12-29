@@ -34,9 +34,9 @@ class SerialError(Exception):
                  msg='',
                  source_exc_info=None):
         self.args = (arg,)
-        self.errno = errno
-        self.port = port
         self.sensor = sensor
+        self.port = port
+        self.errno = errno
         self.function = function
         self.msg = msg
         self.source_exc_info = source_exc_info
@@ -105,7 +105,7 @@ class SerialSensor:
         self.__parity = parity
         self.__stopbits = stopbits
         self.__bytesize = bytesize
-        self.read_command = read_command
+        self.__read_command = read_command
         try:
             self.__connection = Serial(serial_port, baud_rate, bytesize=bytesize, parity=parity,
                                        stopbits=stopbits, timeout=timeout, writeTimeout=writeTimeout)
@@ -303,12 +303,12 @@ class SerialSensor:
     def read(self):
         # self.close()  # Make sure it's closed, so no errors are thrown
         # self.open()
-        if self.read_command is None:
+        if self.__read_command is None:
             raise SerialError("Invalid Data Type -> No read_command set, nothing to send.", self.__name, self.__serial_port, 2, 'read()', source_exc_info=sys.exc_info())
-        if callable(self.read_command):
-            self.send(self.read_command())
+        if callable(self.__read_command):
+            self.send(self.__read_command())
         else:
-            self.send(self.read_command)
+            self.send(self.__read_command)
         time.sleep(self.getWaitTime()/1000)
         reading = self.readJSON()
         # self.close()
@@ -352,6 +352,9 @@ class SerialSensor:
     def getWaitTime(self):
         return float(self.__wait_time)
 
+    def getReadCommand(self):
+        return str(self.__read)
+
     def getBaud(self):
         return int(self.__baud_rate)
 
@@ -361,10 +364,10 @@ class SerialSensor:
     def getLastString(self):
         return str(self.__last_read_string)
 
-    def getJSONSettings(self, name, value):
-        if name != "":
+    def getJSONSettings(self, _key="", _value=""):
+        if _key != "":
             return {"name": self.getName(), "units": self.getUnits(), "wait_time": self.getWaitTime(),
-                    "baud_rate": self.getBaud(), name: value}
+                    "baud_rate": self.getBaud(), "read_command": self.__read_command, _key: _value}
         else:
             return {"name": self.getName(), "units": self.getUnits(), "wait_time": self.getWaitTime(),
-                    "baud_rate": self.getBaud()}
+                    "baud_rate": self.getBaud(), "read_command": self.__read_command}
