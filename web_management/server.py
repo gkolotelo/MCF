@@ -25,8 +25,8 @@ from bson.objectid import ObjectId
 
 # Connect to MongoDB
 try:
-    client = pymongo.MongoClient("cityfarm.media.mit.edu")
-    client.admin.authenticate("admin", "cityfarm")
+    client = pymongo.MongoClient("")
+    client.admin.authenticate("", "")
     board_collection = client['admin']['boards']  # Default DB and collection for storing board settings
     log_collection = client['admin']['log']  # Default DB and collection for storing logs
     # Note that logs and settings are stored with the same ObjectId, which also corresponds to the board's Id
@@ -214,7 +214,9 @@ def build_schema_board(board_info):
                         "required": "true",
                         # "default": sensor[key]['value']
                     }
-                    sensor_value[str(key)] = str(sensor[key]['value'])
+                    # Escape line ending characters if used on read_command, prevents being resaved
+                    # incorrectly after loaded on form
+                    sensor_value[str(key)] = str(sensor[key]['value']).replace('\r', '\\r').replace('\n', '\\n')
                 string['value'][str(i)].append(sensor_value)
                 arr.append(entry)
                 # only one entry needed for schema
