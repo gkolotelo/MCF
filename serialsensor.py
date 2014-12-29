@@ -141,6 +141,7 @@ class SerialSensor:
             raise SerialError("Could not connect to serial device -> Connection closed.", self.__name, self.__serial_port, 0, 'readRaw()', source_exc_info=sys.exc_info())
         try:
             self.__connection.flushInput()
+            time.sleep(0.4)
         except termios.error:
             raise SerialError("Could not connect to serial device -> TERMIOS error.", self.__name, self.__serial_port, 0, 'send()', "flushInput() call", source_exc_info=sys.exc_info())
         command = str(command)  # Gets rid of unicode strings
@@ -320,9 +321,9 @@ class SerialSensor:
     def open(self):
         try:
             self.__connection.open()
-            time.sleep(0.1)
+            time.sleep(0.4)
             self.__connection.flushInput()
-            time.sleep(0.1)
+            time.sleep(0.4)
         except SerialException, e:
             raise SerialError("Could not connect to serial device -> SerialException.", self.__name, self.__serial_port, 0, 'open()', e.message, source_exc_info=sys.exc_info())
         except termios.error:
