@@ -80,7 +80,7 @@ def board_menu(Id):
         new_settings = build_settings_board(request, board_info)
         #print new_settings
         # Save to database:
-        print new_settings
+        #print new_settings
         if updateBoardById(Id, new_settings):
             return "Success"
         else:
@@ -326,7 +326,7 @@ def build_settings_board(request, board_info):
     # Behaviour example:
     # settings[db_name]  -->  a[b]
     # sensors[0][units]  -->  a[b][c]
-    print request.form.items()
+    #print request.form.items()
     for key in request.form.keys():
         a = key[:key.find('[')]  # Holds the key name ('settings' or 'sensors')
         b = key[key.find('[') + 1:key.find(']')]  # Holds the index, if 'sensor', or the content, if settings
