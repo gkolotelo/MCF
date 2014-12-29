@@ -130,7 +130,6 @@ def now():
     return(datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds()
 
 
-# Check existence of settings on file and server, if not create and upload to server
 def initialize(path, hostname, version):
     """
     Initialization routine.
@@ -153,7 +152,7 @@ def initialize(path, hostname, version):
         (settings, client) tuple. With the settings file to be used, and the DB client
     """
     file_settings = getSettingsFromFile(path)  # Get username, password and server
-    for j in xrange(3*60*60/15):
+    for j in xrange(3*60*60/15):  # 720 trials
         try:
             client = mongoConnect(file_settings['settings']['value']['server']['value'],
                                   username=file_settings['settings']['value']['username']['value'],
@@ -229,7 +228,6 @@ def initialize(path, hostname, version):
     return settings, client
 
 
-# Connects to mongoDB database
 def mongoConnect(server, username="", password=""):
     """
     Connects and authenticates to the server if username provided.
@@ -292,7 +290,6 @@ def insertData(data, client, settings):
 #     return settings
 
 
-# Check for updates
 def checkUpdates(current_settings, client, Id, path):
     """
     Checks settings on DB for updates, and updates file and running settings.
@@ -334,8 +331,6 @@ def checkUpdates(current_settings, client, Id, path):
     return None
 
 
-
-# Upload log file to server
 def uploadLog(client, log_path, Id):
     """
     Uploads the current log to the database.
@@ -361,7 +356,6 @@ def uploadLog(client, log_path, Id):
         output("Error uploading log, ignoring...", logger.error)
 
 
-# Save settings to config file
 def saveSettingsToFile(settings, path):
     """
     Saves the settings disctionary to the config file.
@@ -378,7 +372,6 @@ def saveSettingsToFile(settings, path):
         output("Cannot write to file. Continuing without saving...", logger.error)
 
 
-# Save settings to DB
 def saveSettingsToDB(settings, client, Id):
     """
     Saves the settings file to the database, given an Id.
@@ -409,7 +402,6 @@ def saveSettingsToDB(settings, client, Id):
         return None
 
 
-# Gets settings from config file
 def getSettingsFromFile(path):
     """
     Gets settings disctionary from config file.
@@ -437,7 +429,6 @@ def getSettingsFromFile(path):
             quit()
 
 
-# Gets settings from database
 def getSettingsFromDB(client, Id):
     """
     Gets settings disctionary from DB given an Id.
@@ -482,7 +473,7 @@ def waitForInternet(wait):
         while t < wait:
             try:
                 urllib2.urlopen('http://74.125.228.100', timeout=5)  # change this to connect to server (if on intranet)
-                output("Connection estabilished", logger.info)
+                output("Connection estabilished after: " + t + " seconds.", logger.info)
                 return
             except urllib2.URLError:
                 time.sleep(10)
