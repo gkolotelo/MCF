@@ -140,8 +140,8 @@ void loop()
       case 'S':
       case 's':
         //Set LED thresholds
-        //Format: S,LT,HT,LWT,HWT,LH,HH,LCO2,HCO2\r
-        //Format breakdouwn: Set Low_air_Temp,High_air_Temp,Low_Water_temp,High_Water_Temp,Low_Humidity,High_Humidity,Low_CO2,High_CO2
+        //Format: S,LT,HT,LWT,HWT,LH,HH,LCO2,HCO2,K\r
+        //Format breakdouwn: Set Low_air_Temp,High_air_Temp,Low_Water_temp,High_Water_Temp,Low_Humidity,High_Humidity,Low_CO2,High_CO2,Error_Proportionality_Constant
         readString += ','; //Add a comma so the loop below can be made simpler
         int i = readString.indexOf(',');
         for(int j = 0; j < sizeof(thresholds)/sizeof(int) - 1; j++)// -1 to ignore Error_Multiplier
@@ -240,7 +240,7 @@ void makeReadings(){
 
 void setLEDSmooth()
 {
-  //thresholds: LT,HT,LWT,HWT,LH,HH,LCO2,HCO2,Err
+  //thresholds: LT,HT,LWT,HWT,LH,HH,LCO2,HCO2,K
   float r = 0, g = 0, b = 0;
   float error = -(
                 ((((thresholds[0]+thresholds[1])/2) - (temp.value > thresholds[1] ? thresholds[1] : (temp.value < thresholds[0] ? thresholds[0] : temp.value)))/(thresholds[1]-thresholds[0])) +
@@ -249,7 +249,7 @@ void setLEDSmooth()
                 ((((thresholds[6]+thresholds[7])/2) - (co2.value > thresholds[7] ? thresholds[7] : (co2.value < thresholds[6] ? thresholds[6] : co2.value)))/(thresholds[7]-thresholds[6]))
                 )*thresholds[8];
   if(error > 1) error = 1;
-  //if(error < 0) error = 0;
+  if(error < -1) error = -1;//Test change
   if(error < 0)
   {
     b = 255*(-error);
