@@ -1,5 +1,5 @@
-Using the SerialSensor Module
-=============================
+Using the SerialSensor v1.1 Module
+==================================
 
 Content within the module
 -------------------------
@@ -7,9 +7,9 @@ Content within the module
 ============ ===========
 Content        Description
 ------------ -----------
-SerialSensor Used to interact with sensors via a serial port
-SerialError  Passes information from sensors that raised an exception
-listPorts()  Lists available serial ports on the host machine
+SerialSensor Used to interact with sensors via a serial port.
+SerialError  Passes information from sensors that raised an exception.
+listPorts()  Lists available serial ports on the host machine.
 ============ ===========
 
 
@@ -18,7 +18,7 @@ Importing the module
 
 The SerialSensor class can be imported by itself, however sensor information is passed through SerialError when exceptions occur, so it is suggested that it be imported as well. listPorts can be imported if the available serial ports are not known.
 
->>> from serialsensor import SerialSensor, SerialError
+>>> from serialsensor import SerialSensor, SerialError, listPorts
 
 
 Using SerialSensor
@@ -27,39 +27,49 @@ Using SerialSensor
 Following is an example that instantiates one sensor on ``/dev/ttyUSB0``, and prints the received data in the different available formats::
 
     from serialsensor import SerialSensor, SerialError
-    import time
 
-    CRLF = 0
-    CR = 1
-    LF = 2
+    # Instatiating a Temperature sensor located on '/dev/ttyUSB0', whose measurement is given in degrees 
+    # Celsius, each measurement takes 400 milliseconds, and the Baud rate of the sensor is 38400 b/s.
+    # The reading command, in this case, is 'r\r', where the sensor responds with data after 400ms.
 
-    #Instatiating a Temperature sensor located on '/dev/ttyUSB0', whose measurement is given in degrees 
-    #Celsius, each measurement takes 400 milliseconds, and the Baud rate of the sensor is 38400 b/s.
-    sensor = SerialSensor('Temperature', 'C', '/dev/ttyUSB0', 400, 38400)
+        sensor = SerialSensor('Temperature', 'C', '/dev/ttyUSB0', 400, 38400, 'r')  # Note that CR line ending is assumed by default.
 
-    #Print information about sensor:
-    print "Reading from", sensor.getName(), "sensor:"
+    # Print information about sensor:
 
-    #Issue a reading command. In this case, the sensor outputs a reading 400ms after the 'r\r' command.
-    sensor.send('r\r')
+        print "Reading from", sensor.getName(), "sensor:"
 
-    #Wait for the required time. Since the Wait Time is given in ms, it converted to s dividing by 1000
-    time.sleep(sensor.getWaitTime()/1000)
+    # There are two ways to acquire data:
+    # 1. Issue a reading command. In this case, the sensor outputs a reading 400ms after the 'r\r' command.
 
-    #Make readings:
-    #Sensor data as read, converted to CRLF line break:
-    read_string = sensor.readString(CRLF)
+        sensor.send('r\r')  # Alternatively you may use just sensor.send('r'), since CR line ending is assumed by default.
 
-    #Sensor data in floating point values:
-    read_value = sensor.readValues()
+    # Wait for the required time. Since the Wait Time is given in ms, it converted to s dividing by 1000
 
-    #Sensor data in JSON dictionary format, containing the sensor's name, unit and measurement:
-    read_json = sensor.readJSON()
+        time.sleep(sensor.getWaitTime()/1000)
 
-    #Print measurements:
-    print "String:", read_string
-    print "Value:", read_value
-    print "JSON:", read_json
+    # Make readings:
+    # Sensor data as read, converted to CRLF line break:
+    
+        read_string = sensor.readString(CRLF)
+
+    # Sensor data in floating point values:
+    
+        read_value = sensor.readValues()
+
+    # Sensor data in JSON dictionary format, containing the sensor's name, unit and measurement:
+    
+        read_json = sensor.readJSON()
+
+    # Print measurements:
+
+        print "String:", read_string
+        print "Value:", read_value
+        print "JSON:", read_json
+
+    # 2. Read JSON directly, using read() function.
+    # Sends read command, waits for required time, returns JSON dictionary.
+
+        print "Read Function Output:", sensor.read()
 
 Sample output::
 
@@ -67,68 +77,106 @@ Sample output::
     String: 21.98\r\n
     Value: 21.98
     JSON: {"Temperature":{"value":21.98, "units":"C"}}
+    Read Function Output: {"Temperature":{"value":21.98, "units":"C"}}
 
 
-The SerialSensor class can also handle sensor that send CSV values, just instatiate the sensor accordingly, for example:
+The SerialSensor class can also handle sensors that send CSV values, just instatiate the sensor accordingly, for example:
 
 Sensor instantiation::
 
-    #Separate name and units by commas
-    sensor = SerialSensor('Temp_c,Temp_f,Temp_k', 'C,F,K', '/dev/ttyUSB0', 400, 38400)
+    # Separate name and units by commas
+    sensor = SerialSensor('Temp_C,Temp_F,Temp_F', 'C,F,K', '/dev/ttyUSB0', 400, 38400, 'r')
 
 Sample output::
 
     Sensor output: 21.98,71.56,295.13\r
     String: 21.98,71.56,295.13\r\n
     Value: [21.98,71.56,295.13]
-    JSON: {"Temp_c":{"value":21.98, "units":"C"}, "Temp_f":{"value":71.56, "units":"F"}, "Temp_k":{"value":295.13, "units":"K"},}
+    JSON: {"Temp_C":{"value":21.98, "units":"C"}, "Temp_F":{"value":71.56, "units":"F"}, "Temp_K":{"value":295.13, "units":"K"}}
+    Read Function Output: {"Temp_C":{"value":21.98, "units":"C"}, "Temp_F":{"value":71.56, "units":"F"}, "Temp_K":{"value":295.13, "units":"K"}}
 
 
 SerialError
 -----------
 
-In case of an exception, thrown either by serial errors or invalid data types, SerialSensor can throw these exceptions:
+In case of an exception, errors are thrown either by serial connection errors or invalid data types, SerialSensor can throw these exceptions:
 
-================= ============ ===========
-Exception         Error number Description
------------------ ------------ -----------
-Could not connect 0            Could not connect to the serial port during write or read operations
-Invalid Data Type 2            Value received from sensor is of non numeric data type, and cannot be converted 
-================= ============ ===========
+=================== ============ ===========
+Exception           Error number Description
+------------------- ------------ -----------
+Could not connect   0            Could not connect to the serial port during write, read or ancillary operations.
+Device not found    1            Port defined could not be foud. Sensor may have been disconnected.
+Invalid Data Type   2            Value received from sensor is of non numeric data type, and cannot be converted.
+No data read        3            No data present on buffer. May occur if trying to read and no data has been sent.
+I/O Error           5            Termios, IOError or OSError errors cause this exception to be thrown. Usually when serial conn. is not working.
+Did not receive EOL 6            Exception thrown if string received does not have a line ending character. Assumes data is invalid.
+=================== ============ ===========
 
 When thrown, SerialError errors contain the following arguments:
 
 ================= ===========
 Argument          Description
 ----------------- -----------
-args              Descriptor
-errno             Error number
-port              Port the sensor's connected to
-sensor            Sensor name as defined during initialization
-msg               Arbitrary message. On errno=2, the msg field contains the string read from the sensor, for debugging purposes
+args              (tuple) Descriptor
+sensor            (str)   Sensor name as defined during initialization
+port              (str)   Port the sensor's connected to
+errno             (int)   Error number
+function          (str)   Name of the function that raised the exception
+msg               (str)   Arbitrary message. Provides further details specific to certain circumstances.
+source_exc_info   (type, value, traceback) When available provides the source exeption information that has cause the error.
 ================= ===========
 
-The ``checkConnection()`` method can be invoked on a sensor to check for serial connection errors, if the connection is unavailable, ``cehckConnection(True)`` can be used to try to repair the serial connection.
+
+Method details
+--------------
+
+SerialSensor(name, units, serial_port, wait_time, baud_rate=9600, read_command=None, bytesize=8, parity='N', stopbits=1, timeout=5, writeTimeout=5)
+
+``send(command)``: Sends the ``command`` string to the sensor. CR line breaks are assumed if no line ending is provided. Explicitly define the line ending if using one other that CR.
+
+``readRaw()``: Returns the raw string as read from the sensor until the first line ending character. If no line ending character is received, error 6 is thrown.
 
 
-Methods Details
----------------
-
-``send()``: The send method by default sends commands with CR line breaks, even if different line breaks (or none at all) are given on the argument. An exception is thrown if the sensor cannot be reached (errno 0)
-
-``readJSON()``: The readJSON method returns the smallest number of values available, i.e. if the number of measurement names or units provided, or the number of values read is different from one another, name, unit and value will be matched until there isn't one of each to be matched.
-
-``readString()``: The readString mothod returns by default a CRLF ended string, CR and LF can be chosen by using 1 and 2 as arguments, respectively.
+``readString(mode=CRLF)``: Returns the raw string with a default line ending, set by ``mode``
 
 
+``readValues()``: Returns a list of numerical values, which correspond to the values read by the sensor. If the string cannot be converted to numerical values, error 2 is thrown.
 
 
+``readJSON()``: Returns the JSON dictionary with names units and values of the measurements read from the sensor.
 
 
+``read()``: Executes 3 methods in sequence, first calls ``send(read_command)``, where 'read_command' is the string or function set during initialization; then waits for ``wait_time`` through getWaitTime() amount of time; finally returns the JSON dictionary through ``readJSON()``
 
 
+``open()``: Opens the serial port. Raises an exception if the port cannot be opened.
 
 
+``close()``: Closes the serial port.
 
 
+``getName()``: Returns the ``name`` string.
 
+
+``isEnabled()`` Returns wether the ``enabled`` flag is True or False
+
+
+``enable(enable)`` Sets the ``enabled`` flag to the value in the argument.
+
+
+``getPort()``: Returns the ``port`` string.
+
+
+``getWaitTime()``: Returns the ``wait_time`` integer.
+
+
+``getBaud()``: Returns the ``baud_rate`` integer.
+
+
+``getUnits()``: Returns the ``units`` string.
+
+
+``getLastString()``: Returns the last raw string read from ``readRaw()``.
+
+
+``getJSONSettings(_key="", _value="")``: Returns a JSON dictionary with 5 (optionally 6) keys: ``name``, ``units``, ``baud_rate``, ``wait_time``, ``read_command``, and if provided ``_key``.
