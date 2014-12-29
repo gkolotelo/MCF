@@ -466,19 +466,19 @@ def waitForInternet(wait):
     """
     try:
             urllib2.urlopen('http://74.125.228.100', timeout=5)  # Google
-            output("Connection estabilished\n", logger.info)
+            output("Internet connection estabilished\n", logger.info)
     except urllib2.URLError:
         t = 0
         output("Waiting up to: " + str(wait) + " seconds for connection...", logger.info)
         while t < wait:
             try:
                 urllib2.urlopen('http://74.125.228.100', timeout=5)  # change this to connect to server (if on intranet)
-                output("Connection estabilished after: " + t + " seconds.", logger.info)
+                output("Internet connection estabilished after: " + t + " seconds.", logger.info)
                 return
             except urllib2.URLError:
                 time.sleep(10)
             t += 15
-        output("No Connection, exiting...", logger.info)
+        output("No Internet connection, exiting...", logger.info)
         quit()
 
 
@@ -651,8 +651,6 @@ def main():
     global client
     global settings
 
-    time.sleep(10)
-
     # initialization routine, and get new settings and DB client
     settings, client = initialize(config_path, hostname, version)
 
@@ -751,37 +749,47 @@ def main():
                 i.read()
                 output("No problems found", logger.info)
             except SerialError, e:
-                for j in xrange(4):
+                for j in xrange(3):
                     try:
                         i.close()
+                        time.sleep(0.4)
                         i.open()
+                        time.sleep(0.4)
                         i.read()
+                        time.sleep(0.4)
                         break
-                    except:
-                        output("Exception occured during #" + str(j) + " trial:")
+                    except SerialError, e:
+                        output("SerialError Exception occured during #" + str(j) + " trial:", logger.error)
                         output(e.SourceTraceback(), logger.error)
                         time.sleep(0.4)
-                if j >= 3:  # If exhausted trials
+                    except:
+                        output("Unknown Exception occured during #" + str(j) + " trial:", logger.error)
+                        output(traceback.format_exc(), logger.error)
+                        time.sleep(0.4)
+                if j >= 2:  # If exhausted trials
                     try:
                         i.close()
+                        time.sleep(0.4)
                         i.open()
+                        time.sleep(0.4)
                         i.read()
+                        time.sleep(0.4)
                     except SerialError, e:
-                        output("Exhausted trials:")
+                        output("Exhausted maximum number of trials:", logger.error)
+                        output(e.SourceTraceback(), logger.error)
                         if e.errno == 5:
                             try:
-                                res = i.getPort() != getTTYFromPath(getSysPathFromTTY(i.getPort()))
+                                ports_still_same = i.getPort() == getTTYFromPath(getSysPathFromTTY(i.getPort()))
                             except:
-                                res = False
-                            if res:
-                                print "Ports are different!"  # For debugging, remove.
+                                ports_still_same = False
+                            sys.exit(0)
+                            if not ports_still_same:
                                 output("\n\nReloading sensors due to exception in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno) + "\n\n", logger.error)
                                 output(e.SourceTraceback(), logger.error)
                                 uploadLog(client, log_path, settings['_id'])
                                 return
                             else:
                                 output("Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
-                                output("The previous error was due to the following exception:", logger.error)
                                 output(e.SourceTraceback(), logger.error)
                                 uploadLog(client, log_path, settings['_id'])
                                 os.system("systemctl reboot")
@@ -841,7 +849,6 @@ def main():
 
 if __name__ == '__main__':
     output("\n\nStarted execution:\n\n", logger.info)
-    time.sleep(20)
     # Waits for internet connection (up to 3600 seconds), exits if not found.
     waitForInternet(60*60*5)
     while True:
