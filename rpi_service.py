@@ -316,7 +316,11 @@ def checkUpdates(current_settings, client, Id, path):
         curr_date = time.strptime(current_settings['changes']['date'], "%m/%d/%y %I:%M:%S%p")
     except:
         curr_date = 0
-    if curr_date < time.strptime(db_settings['changes']['date'], "%m/%d/%y %I:%M:%S%p"):
+    try:
+        db_date = time.strptime(db_settings['changes']['date'], "%m/%d/%y %I:%M:%S%p")
+    except:
+        db_date = 0
+    if curr_date < db_date:
         output("New settings found on DB, updating...", logger.info)
         saveSettingsToFile(db_settings, path)
         # updateSettings(db_settings)  # settings is now equal to db_setings
