@@ -128,13 +128,13 @@ class SerialSensor:
         self.__connection.flushInput()
         time.sleep(0.1)
 
-    def send_hex(self, command):
-        self.__connection.flushInput()
-        time.sleep(0.1)
-        try:
-            self.__connection.write(command)
-        except serial.SerialTimeoutException:
-            raise SerialError("Timeout on device", self.__name, self.__serial_port, 0, source_exc_info=sys.exc_info())
+#    def send_hex(self, command):
+#        self.__connection.flushInput()
+#        time.sleep(0.1)
+#        try:
+#            self.__connection.write(command)
+#        except serial.SerialTimeoutException:
+#            raise SerialError("Timeout on device", self.__name, self.__serial_port, 0, source_exc_info=sys.exc_info())
 
     def send(self, command):
         if not self.__connection.isOpen():
@@ -207,8 +207,9 @@ class SerialSensor:
             raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'readRaw()', "Error: " + str(e), source_exc_info=sys.exc_info())
         return string
 
-    def read_hex(self):
-        string = self.readRaw()
+
+#    def read_hex(self):
+#        string = self.readRaw()
 
     def readString(self, mode=CRLF):  # Available modes CRLF, LF, CR
         string = self.readRaw()
@@ -224,51 +225,51 @@ class SerialSensor:
             string += '\r\n'  # use CRLF as default
         return string
 
-    def check_connection(self, repair=False):
-        result = self.__connection.isOpen()
-        if not repair:
-            return result
-        if result:
-            return result
-        try:
-            self.__connection.open()
-            time.sleep(0.3)
-            if self.__connection.isOpen():
-                return True
-        except:
-            pass
-        self.__connection.close()
-        time.sleep(0.7)
-        try:
-            self.__connection = Serial(self.__serial_port, self.__baud_rate, self.__bytesize, self.__parity,
-                                       self.__stopbits, self.__timeout, self.__writeTimeout)
-            time.sleep(0.3)
-            self.__connection.write('\r')
-            time.sleep(0.3)
-        except serial.SerialException:
-            return False
-        except serial.SerialTimeoutException:
-            return False
-        except termios.error:
-            return False
-        except OSError:
-            return False
-        return self.__connection.isOpen()
-
-    def repair_connection(self, errno):
-        if errno == 0:
-            result = self.__connection.isOpen()
-            # Simply try again
-            if result:
-                return result
-        elif errno == 1:
-            pass
-        elif errno == 2:
-            pass
-        elif errno == 3:
-            pass
-        elif errno == 5:
-            pass
+#    def check_connection(self, repair=False):
+#        result = self.__connection.isOpen()
+#        if not repair:
+#            return result
+#        if result:
+#            return result
+#        try:
+#            self.__connection.open()
+#            time.sleep(0.3)
+#            if self.__connection.isOpen():
+#                return True
+#        except:
+#            pass
+#        self.__connection.close()
+#        time.sleep(0.7)
+#        try:
+#            self.__connection = Serial(self.__serial_port, self.__baud_rate, self.__bytesize, self.__parity,
+#                                       self.__stopbits, self.__timeout, self.__writeTimeout)
+#            time.sleep(0.3)
+#            self.__connection.write('\r')
+#            time.sleep(0.3)
+#        except serial.SerialException:
+#            return False
+#        except serial.SerialTimeoutException:
+#            return False
+#        except termios.error:
+#            return False
+#        except OSError:
+#            return False
+#        return self.__connection.isOpen()
+#
+#    def repair_connection(self, errno):
+#        if errno == 0:
+#            result = self.__connection.isOpen()
+#            # Simply try again
+#            if result:
+#                return result
+#        elif errno == 1:
+#            pass
+#        elif errno == 2:
+#            pass
+#        elif errno == 3:
+#            pass
+#        elif errno == 5:
+#            pass
 
 
 
