@@ -140,10 +140,10 @@ void loop()
       case 'S':
       case 's':
         //Set LED thresholds
-        //Format: S LT,HT,LWT,HWT,LH,HH,LCO2,HCO2\r
+        //Format: S,LT,HT,LWT,HWT,LH,HH,LCO2,HCO2\r
         //Format breakdouwn: Set Low_air_Temp,High_air_Temp,Low_Water_temp,High_Water_Temp,Low_Humidity,High_Humidity,Low_CO2,High_CO2
         readString += ','; //Add a comma so the loop below can be made simpler
-        int i = readString.indexOf(' ');
+        int i = readString.indexOf(',');
         for(int j = 0; j < sizeof(thresholds)/sizeof(int) - 1; j++)// -1 to ignore Error_Multiplier
         {
           readString = readString.substring(i+1);
