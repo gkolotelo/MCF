@@ -1,0 +1,157 @@
+Dust:
+http://www.seeedstudio.com/wiki/Grove_-_Dust_sensor
+
+sample:
+
+/* Grove - Dust Sensor Demo v1.0
+ Interface to Shinyei Model PPD42NS Particle Sensor
+ Program by Christopher Nafis 
+ Written April 2012
+ 
+ http://www.seeedstudio.com/depot/grove-dust-sensor-p-1050.html
+ http://www.sca-shinyei.com/pdf/PPD42NS.pdf
+ 
+ JST Pin 1 (Black Wire)  => Arduino GND
+ JST Pin 3 (Red wire)    => Arduino 5VDC
+ JST Pin 4 (Yellow wire) => Arduino Digital Pin 8
+ */
+
+int pin = 8;
+unsigned long duration;
+unsigned long starttime;
+unsigned long sampletime_ms = 30000;//sampe 30s ;
+unsigned long lowpulseoccupancy = 0;
+float ratio = 0;
+float concentration = 0;
+
+void setup() {
+  Serial.begin(9600);
+  pinMode(8,INPUT);
+  starttime = millis();//get the current time;
+}
+
+void loop() {
+  duration = pulseIn(pin, LOW);
+  lowpulseoccupancy = lowpulseoccupancy+duration;
+
+  if ((millis()-starttime) > sampletime_ms)//if the sampel time == 30s
+  {
+    ratio = lowpulseoccupancy/(sampletime_ms*10.0);  // Integer percentage 0=>100
+    concentration = 1.1*pow(ratio,3)-3.8*pow(ratio,2)+520*ratio+0.62; // using spec sheet curve
+    Serial.print(lowpulseoccupancy);
+    Serial.print(",");
+    Serial.print(ratio);
+    Serial.print(",");
+    Serial.println(concentration);
+    lowpulseoccupancy = 0;
+    starttime = millis();
+  }
+}
+
+
+UV:
+http://www.seeedstudio.com/wiki/Grove_-_UV_Sensor
+
+O2:
+http://www.seeedstudio.com/wiki/Grove_-_Gas_Sensor(O%E2%82%82)
+
+barometer:
+http://www.seeedstudio.com/wiki/Grove_-_Barometer_Sensor_(BMP180)
+
+sample:
+/* Barometer demo V1.0
+* Based largely on code by  Jim Lindblom
+* Get pressure, altitude, and temperature from the BMP085.
+* Serial.print it out at 9600 baud to serial monitor.
+*
+* By:http://www.seeedstudio.com
+*/
+#include "Barometer.h"
+#include <Wire.h>
+float temperature;
+float pressure;
+float atm;
+float altitude;
+Barometer myBarometer;
+void setup(){
+  Serial.begin(9600);
+  myBarometer.init();
+  
+}
+
+void loop()
+{
+   temperature = myBarometer.bmp085GetTemperature(myBarometer.bmp085ReadUT()); //Get the temperature, bmp085ReadUT MUST be called first
+   pressure = myBarometer.bmp085GetPressure(myBarometer.bmp085ReadUP());//Get the temperature
+   altitude = myBarometer.calcAltitude(pressure); //Uncompensated caculation - in Meters 
+   atm = pressure / 101325; 
+  
+  Serial.print("Temperature: ");
+  Serial.print(temperature, 2); //display 2 decimal places
+  Serial.println("deg C");
+
+  Serial.print("Pressure: ");
+  Serial.print(pressure, 0); //whole number only.
+  Serial.println(" Pa");
+
+  Serial.print("Ralated Atmosphere: ");
+  Serial.println(atm, 4); //display 4 decimal places
+
+  Serial.print("Altitude: ");
+  Serial.print(altitude, 2); //display 2 decimal places
+  Serial.println(" m");
+
+  Serial.println();
+
+  delay(1000); //wait a second and get values again.
+}
+
+
+
+
+
+
+
+
+
+
+NO2/CO:
+
+
+#define AQ_CONTROL_PIN 2 // Digital
+#define AQ_SENSE_PIN 0 // Analog
+
+bool preheating = false;
+
+void setup(){
+  Serial.begin(9600);
+  pinMode( AQ_CONTROL_PIN, OUTPUT );
+  
+  // Turn on heater for preheating
+  // We'll turn it back off after 10 seconds
+  Serial.println("Preheating");
+  preheating = true;
+  digitalWrite(AQ_CONTROL_PIN, HIGH);
+}
+
+void loop(){
+  // Turn off heater if 10 seconds have passed
+  if (preheating && millis() > 10000) {
+    preheating = false;
+    Serial.println("Preheating Complete");
+    digitalWrite( AQ_CONTROL_PIN, LOW );
+  }
+  
+  // Get Values
+  int NO2 = analogRead(AQ_SENSE_PIN);
+  int CO = analogRead(AQ_SENSE_PIN + 1);
+  
+  // Print
+  Serial.print("NO2: ");
+  Serial.println(NO2);
+  Serial.print("CO: ");
+  Serial.println(CO);
+  Serial.println(" ");
+  
+  delay(1000);
+}
