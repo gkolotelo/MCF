@@ -362,5 +362,9 @@ class SerialSensor:
         return str(self.__last_read_string)
 
     def getJSONSettings(self, name, value):
-        return {"name": self.getName(), "units": self.getUnits(), "wait_time": self.getWaitTime(),
-                "baud_rate": self.getBaud(), name: value}
+        if name != "":
+            return {"name": self.getName(), "units": self.getUnits(), "wait_time": self.getWaitTime(),
+                    "baud_rate": self.getBaud(), name: value}
+        else:
+            return {"name": self.getName(), "units": self.getUnits(), "wait_time": self.getWaitTime(),
+                    "baud_rate": self.getBaud()}
