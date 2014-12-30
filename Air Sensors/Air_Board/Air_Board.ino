@@ -18,6 +18,7 @@ String vers = "Air Sensor Board V0.3.1 12/21/2014";
 #include "Adafruit_SI1145.h"
 #include "DHT.h"
 #include "OneWire.h"
+#include <math.h>
 #include <SoftwareSerial.h>
 
 //Sensor data type
@@ -70,9 +71,9 @@ sensor* sensors[] = {&co2, &light, &uv, &ir, &o2, &water_temp, &temp, &co2_temp,
 int number_of_meas = sizeof(sensors) / sizeof(sensor*);
 
 //Initial Thresholds:
-//thresholds: LT,HT,LWT,HWT,LH,HH,LCO2,HCO2,Err
-//Format breakdouwn: Set Low_air_Temp,High_air_Temp,Low_Water_temp,High_Water_Temp,Low_Humidity,High_Humidity,Low_CO2,High_CO2, Error_Multiplier
-int thresholds[] = {20, 25, 20, 25, 40, 60, 350, 650, 1};
+//thresholds: LT,HT,KT,LWT,HWT,KWT,LH,HH,KH,LCO2,HCO2,KCO2,KErr
+//Format breakdouwn: Set Low_air_Temp,High_air_Temp,K_air_temp,Low_Water_temp,High_Water_Temp,K_water_temp,Low_Humidity,High_Humidity,K_humidity,Low_CO2,High_CO2,K_CO2,K_Error_Multiplier
+float thresholds[] = {20, 25, 20, 20, 25, 200, 40, 60, 900, 400, 600, 300, 100};
 
 //Methods
 void makeReadings();
@@ -125,6 +126,7 @@ void loop()
         {
           //Prints sensor data in the following order:
           //co2, light, uv, ir, o2, water_temp, temp, co2_temp, humidity, co2_humidity, dust_conc
+          Serial.print(sensors[j]->name);
           Serial.print(sensors[j]->value);
           if (j == number_of_meas-1) Serial.println();
           else Serial.print(",");
@@ -144,7 +146,7 @@ void loop()
         //Format breakdouwn: Set Low_air_Temp,High_air_Temp,Low_Water_temp,High_Water_Temp,Low_Humidity,High_Humidity,Low_CO2,High_CO2,Error_Proportionality_Constant
         readString += ','; //Add a comma so the loop below can be made simpler
         int i = readString.indexOf(',');
-        for(int j = 0; j < sizeof(thresholds)/sizeof(int) - 1; j++)// -1 to ignore Error_Multiplier
+        for(int j = 0; j < sizeof(thresholds)/sizeof(float); j++)
         {
           readString = readString.substring(i+1);
           i = readString.indexOf(',');
@@ -238,27 +240,91 @@ void makeReadings(){
   digitalWrite(ledpin, LOW);//Turn off status LED
 }
 
+float error(float reading, float L, float H, float a)
+{
+  //e -> Error
+  //L -> Low Threshold
+  //H -> High Threshold
+  //a -> Error Slew Ratio (between 0 and 1, the higher the faster the LED colors change)
+  //a makes the logit function == 1 at 0.5 +- a/2
+  a = a/1000;
+  float err = reading * a/(H-L) - L*a/(H - L) + (0.5 - a/2);
+  if(err <= 0.001) err = 0.001;
+  if(err >= 0.999) err = 0.999;
+  Serial.println(err);
+  float correction = log( (a/2 + 0.5) / (1 - (a/2 + 0.5)) );
+  err = log(err/(1-err))/correction/5;
+  if(err <= -1) return -1;
+  if(err >= 1) return 1;
+  return err;
+}
+
 void setLEDSmooth()
 {
-  //thresholds: LT,HT,LWT,HWT,LH,HH,LCO2,HCO2,K
+  //thresholds: LT,HT,KT,LWT,HWT,KWT,LH,HH,KH,LCO2,HCO2,KCO2,K
+  //thresholds[0] -> LT
+  //thresholds[1] -> HT
+  //thresholds[2] -> KT
+  //thresholds[3] -> LWT
+  //thresholds[4] -> HWT
+  //thresholds[5] -> KWT
+  //thresholds[6] -> LH
+  //thresholds[7] -> HH
+  //thresholds[8] -> KH
+  //thresholds[9] -> LCO2
+  //thresholds[10]-> HCO2
+  //thresholds[11]-> KCO2
+  //thresholds[12]-> K
+//Old:
+//  float r = 0, g = 0, b = 0;
+//  float err_T = ((((thresholds[0]+thresholds[1])/2) - (temp.value > thresholds[1] ? thresholds[1] : (temp.value < thresholds[0] ? thresholds[0] : temp.value)))/(thresholds[1]-thresholds[0]))*thresholds[2];
+//  float err_WT = ((((thresholds[3]+thresholds[4])/2) - (water_temp.value > thresholds[4] ? thresholds[4] : (water_temp.value < thresholds[3] ? thresholds[3] : water_temp.value)))/(thresholds[4]-thresholds[3]))*thresholds[5];
+//  float err_H = ((((thresholds[6]+thresholds[7])/2) - (humidity.value > thresholds[7] ? thresholds[7] : (humidity.value < thresholds[6] ? thresholds[6] : humidity.value)))/(thresholds[7]-thresholds[6]))*thresholds[8];
+//  float err_CO2 = ((((thresholds[9]+thresholds[10])/2) - (co2.value > thresholds[10] ? thresholds[10] : (co2.value < thresholds[9] ? thresholds[9] : co2.value)))/(thresholds[10]-thresholds[9]))*thresholds[11];
+//  Serial.print("T ");
+//  Serial.println(err_T);
+//  Serial.print("WT ");
+//  Serial.println(err_WT);
+//  Serial.print("H ");
+//  Serial.println(err_H);
+//  Serial.print("CO2 ");
+//  Serial.println(err_CO2);
+//  float max_err = max(fabs(err_T), max(fabs(err_H), max(fabs(err_CO2), fabs(err_WT))));
+//  float min_err = min(err_T, min(err_H, min(err_CO2, err_WT)));
+//  Serial.print("Max ");
+//  Serial.println(max_err);
+//  Serial.print("Min ");
+//  Serial.println(min_err);
+//  float err;
+//  if (max_err == fabs(min_err))//error is negative
+//    err = - min_err*min_err*min_err*thresholds[12];
+//  else err = - max_err*max_err*max_err*thresholds[12];
+//  Serial.print("err ");
+//  Serial.println(err);
+//  Serial.print("Error ");
+//  Serial.println(error(err));
+//New:
   float r = 0, g = 0, b = 0;
-  float error = -(
-                ((((thresholds[0]+thresholds[1])/2) - (temp.value > thresholds[1] ? thresholds[1] : (temp.value < thresholds[0] ? thresholds[0] : temp.value)))/(thresholds[1]-thresholds[0])) +
-                ((((thresholds[2]+thresholds[3])/2) - (water_temp.value > thresholds[3] ? thresholds[3] : (water_temp.value < thresholds[2] ? thresholds[2] : water_temp.value)))/(thresholds[3]-thresholds[2])) +
-                ((((thresholds[4]+thresholds[5])/2) - (humidity.value > thresholds[5] ? thresholds[5] : (humidity.value < thresholds[4] ? thresholds[4] : humidity.value)))/(thresholds[5]-thresholds[4])) +
-                ((((thresholds[6]+thresholds[7])/2) - (co2.value > thresholds[7] ? thresholds[7] : (co2.value < thresholds[6] ? thresholds[6] : co2.value)))/(thresholds[7]-thresholds[6]))
-                )*thresholds[8];
-  if(error > 1) error = 1;
-  if(error < -1) error = -1;//Test change
-  if(error < 0)
+  float err_WT = error(water_temp.value, thresholds[3], thresholds[4], thresholds[5]);
+  float err_T = error(temp.value, thresholds[0], thresholds[1], thresholds[2]);
+  float err_H = error(humidity.value, thresholds[6], thresholds[7], thresholds[8]);
+  float err_CO2 = error(co2.value, thresholds[9], thresholds[10], thresholds[11]);
+  float max_err = max(fabs(err_T), max(fabs(err_H), max(fabs(err_CO2), fabs(err_WT))));
+  float min_err = min(err_T, min(err_H, min(err_CO2, err_WT)));
+  float err;
+  if (max_err == fabs(min_err))//error is negative
+    err = min_err*(thresholds[12]/100);
+  else err = max_err*(thresholds[12]/100);
+  //Set LEDs:
+  if(err < 0)
   {
-    b = 255*(-error);
-    g = 255*(1+error);
+    b = 255*(-err);
+    g = 255*(1+err);
   }
   else
   {
-    g = 255*(1-error);
-    r = 255*(error);
+    g = 255*(1-err);
+    r = 255*(err);
   }
   pixels.setBrightness(80);
   uint32_t c = pixels.getPixelColor(1);
