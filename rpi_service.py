@@ -30,6 +30,7 @@ import sys
 import time
 import urllib2
 import subprocess
+import traceback
 import pymongo
 from pymongo import errors
 import logging
@@ -672,18 +673,16 @@ def main():
         output(printout, logger.info)
         del printout
 
-        # Find and match serial ports:
-        matchSerialPorts(settings, client, config_path)
-
         try:
+            # Find and match serial ports:
+            matchSerialPorts(settings, client, config_path)
             # If all sensors from settings found, continue:
             sensors = instantiateSensors(settings['sensors']['value'])
-        except SerialError, e:
-            if e.errno == 5:
-                output("Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
-                uploadLog(client, log_path, settings['_id'])
-                os.system("systemctl reboot")
-                sys.exit(0)
+        except:
+            output("Rebooting board...", logger.error)
+            uploadLog(client, log_path, settings['_id'])
+            os.system("systemctl reboot")
+            sys.exit(0)
 
         # Display initialized sensors
         output("Available sensors:", logger.info)
@@ -745,78 +744,60 @@ def main():
             output(e, logger.error)
             output("The previous error was due to the following exception:", logger.error)
             output(e.SourceTraceback(), logger.error)
-            try:
-                i.read()
-                output("No problems found", logger.info)
-            except SerialError, e:
-                for j in xrange(3):
-                    try:
-                        i.close()
-                        time.sleep(0.4)
-                        i.open()
-                        time.sleep(0.4)
-                        i.read()
-                        time.sleep(0.4)
-                        break
-                    except SerialError, e:
-                        output("SerialError Exception occured during #" + str(j) + " trial:", logger.error)
-                        output(e.SourceTraceback(), logger.error)
-                        time.sleep(0.4)
-                    except:
-                        output("Unknown Exception occured during #" + str(j) + " trial:", logger.error)
-                        output(traceback.format_exc(), logger.error)
-                        time.sleep(0.4)
-                if j >= 2:  # If exhausted trials
-                    try:
-                        i.close()
-                        time.sleep(0.4)
-                        i.open()
-                        time.sleep(0.4)
-                        i.read()
-                        time.sleep(0.4)
-                    except SerialError, e:
-                        output("Exhausted maximum number of trials:", logger.error)
-                        output(e.SourceTraceback(), logger.error)
-                        if e.errno == 5:
-                            try:
-                                ports_still_same = i.getPort() == getTTYFromPath(getSysPathFromTTY(i.getPort()))
-                            except:
-                                ports_still_same = False
-                            sys.exit(0)
-                            if not ports_still_same:
-                                output("\n\nReloading sensors due to exception in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno) + "\n\n", logger.error)
-                                output(e.SourceTraceback(), logger.error)
-                                uploadLog(client, log_path, settings['_id'])
-                                return
-                            else:
-                                output("Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
-                                output(e.SourceTraceback(), logger.error)
-                                uploadLog(client, log_path, settings['_id'])
-                                os.system("systemctl reboot")
-                                sys.exit(0)
-                        if e.errno == 0 or e.errno == 3:
+            for j in xrange(3):
+                try:
+                    i.close()
+                    i.open()
+                    i.read()
+                    break
+                except SerialError, e:
+                    output("SerialError Exception occured during #" + str(j) + " trial:", logger.error)
+                    output(e.SourceTraceback(), logger.error)
+                    time.sleep(0.4)
+                except:
+                    output("Unknown Exception occured during #" + str(j) + " trial:", logger.error)
+                    output(traceback.format_exc(), logger.error)
+                    time.sleep(0.4)
+            if j >= 2:  # If exhausted trials
+                try:
+                    i.close()
+                    i.open()
+                    i.read()
+                except SerialError, e:
+                    output("Exhausted maximum number of trials:", logger.error)
+                    output(e.SourceTraceback(), logger.error)
+                    if e.errno == 5:
+                        try:
+                            ports_still_same = i.getPort() == getTTYFromPath(getSysPathFromTTY(i.getPort()))
+                        except:
+                            ports_still_same = False
+                        if not ports_still_same:
                             output("\n\nReloading sensors due to exception in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno) + "\n\n", logger.error)
                             output(e.SourceTraceback(), logger.error)
                             uploadLog(client, log_path, settings['_id'])
                             return
-
-                        output("Fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
-                        output("Error cannot be fixed by reloading or rebooting. Check Board!", logger.error)
+                        else:
+                            output("Rebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
+                            output(e.SourceTraceback(), logger.error)
+                            uploadLog(client, log_path, settings['_id'])
+                            os.system("systemctl reboot")
+                            sys.exit(0)
+                    if e.errno == 0 or e.errno == 3:
+                        output("\n\nReloading sensors due to exception in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno) + "\n\n", logger.error)
                         output(e.SourceTraceback(), logger.error)
-                        quit()
-
-                    except:
-                        output("Rebooting board, due to unhandled fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
-                        logger.exception("Unhandled Exception:")
                         uploadLog(client, log_path, settings['_id'])
-                        os.system("systemctl reboot")
-                        sys.exit(0)
-            except:
-                output("Unhandled Exception, non SerialError in SerialError exception, rebooting...")
-                logger.exception("Unhandled Exception, non SerialError in SerialError exception, rebooting...")
-                uploadLog(client, log_path, settings['_id'])
-                os.system("systemctl reboot")
-                sys.exit(0)
+                        return
+
+                    output("Fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
+                    output("Error cannot be fixed by reloading or rebooting. Check Board!", logger.error)
+                    output(e.SourceTraceback(), logger.error)
+                    quit()
+                except:
+                    output("Rebooting board due to non SerialError fault in: " + e.sensor + ' @ ' + e.port + ', Errno ' + str(e.errno), logger.error)
+                    output(traceback.format_exc(), logger.error)
+                    uploadLog(client, log_path, settings['_id'])
+                    os.system("systemctl reboot")
+                    sys.exit(0)
 
         except pymongo.errors.AutoReconnect, e:
             output("Connection to database Lost, trying to reconnect every 30 seconds up to 500 times", logger.error)
@@ -839,10 +820,12 @@ def main():
             quit()
 
         except:
-            output("Unhandled Exception, non SerialError in main while loop, rebooting...", logger.exception)
+            output("Rebooting board due to non Unhandled Exception in main while loop", logger.error)
+            output(traceback.format_exc(), logger.error)
             uploadLog(client, log_path, settings['_id'])
             os.system("systemctl reboot")
             sys.exit(0)
+
         finally:
             uploadLog(client, log_path, settings['_id'])
 
