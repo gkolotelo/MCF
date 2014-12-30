@@ -300,15 +300,19 @@ class SerialSensor:
             json_dict.update({names[i]: {"value": values[i], "units": units[i]}})
         return json_dict
 
-    def read(self):
+    def read(self, force_command=None):
         # self.close()  # Make sure it's closed, so no errors are thrown
         # self.open()
-        if self.__read_command is None:
-            raise SerialError("Invalid Data Type -> No read_command set, nothing to send.", self.__name, self.__serial_port, 2, 'read()', source_exc_info=sys.exc_info())
-        if callable(self.__read_command):
-            self.send(self.__read_command())
+        if force_command is None:
+            command = self.__read_command
         else:
-            self.send(self.__read_command)
+            command = force_command
+        if command is None:
+            raise SerialError("Invalid Data Type -> No read_command set, nothing to send.", self.__name, self.__serial_port, 2, 'read()', source_exc_info=sys.exc_info())
+        if callable(command):
+            self.send(command())
+        else:
+            self.send(command)
         time.sleep(self.getWaitTime()/1000)
         reading = self.readJSON()
         # self.close()
