@@ -148,7 +148,7 @@ class SerialSensor:
         if command[-1:] != '\n' or command[-1:] != '\r':  # If line ending not defined, default to CR
             command += '\r'
         try:
-            self.__connection.write(command)
+            print self.__connection.write(command)
         except serial.SerialTimeoutException:
             raise SerialError("Timeout on device", self.__name, self.__serial_port, 0, 'send()', "write() call", source_exc_info=sys.exc_info())
         except serial.SerialException, e:
