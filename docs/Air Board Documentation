@@ -23,7 +23,9 @@ The Status feedback lights make it easy to determine the air/water quality statu
 
 Error calculation is given by:
 
-	Sum for sensors of -K*((LT + HT)/2 - (reading if LT<reading<HT, LT if LT>reading, HT if reading>HT))/(HT-LT)
+	maximum of the errors where each error is given by error(reading,, Low_Threshold, High_Threshold, Slew_Rate)
+
+	The error function is an inverse sigmoid (logit) function, where the slew rate variable determines how fast the error diverges from zero when near the thresholds.
 
 The LEDs color are set based on this error.
 
@@ -36,15 +38,19 @@ Serial Commands:
 
 	``i\r``: Returns information about the Air Board.
 
-	``s,LT,HT,LWT,HWT,LH,HH,LCO2,HCO2,K\r``: Sets the threshold values, where:
+	``s,LT,HT,SRT,LWT,HWT,SRWT,LH,HH,SRH,LCO2,HCO2,SRCO2,KErr%\r``: Sets the threshold values, where:
 
-			LT:   Low Air Temperature Threshold
-			HT:   High Air Temperature Threshold
-			LWT:  Low Water Temperature Threshold
-			HWT:  High Water Temperature Threshold
-			LH:   Low Humidity Threshold
-			HH:   High Humidity Threshold
-			LCO2: Low CO2 Threshold
-			HCO2: High CO2 Threshold
-			K:    Proportionality Constant
+			LT:   	Low Air Temperature Threshold
+			HT:   	High Air Temperature Threshold
+			SRT:  	Slew Rate of Air Temperature error function
+			LWT:  	Low Water Temperature Threshold
+			HWT:  	High Water Temperature Threshold
+			SRWT: 	Slew Rate of Water Temperature error function
+			LH:   	Low Humidity Threshold
+			HH:   	High Humidity Threshold
+			SRH:    Slew Rate of Humidity error function
+			LCO2: 	Low CO2 Threshold
+			HCO2: 	High CO2 Threshold
+			SRCO2:	Slew Rate of CO2 error function
+			KErr%:	Constant that multiplies final error
 
