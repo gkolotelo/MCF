@@ -251,7 +251,10 @@ def mongoConnect(server, username="", password=""):
         output("Connected to " + client.host, logger.info)
         return client
     except pymongo.errors.ConnectionFailure:
-        output(('Could not connect to MongoDB at: "' + server + '"'), logger.error)
+        output("Configuration error, please check settings. Exiting.", logger.error)
+        sys.exit(0)  # Don't bother with quit(), no connection anyway
+    except pymongo.errors.ConnectionFailure:
+        output('Could not connect to MongoDB at: "' + server + '"', logger.error)
         raise
 
 
@@ -474,7 +477,7 @@ def waitForInternet(wait):
         while t < wait:
             try:
                 urllib2.urlopen('http://74.125.228.100', timeout=5)  # change this to connect to server (if on intranet)
-                output("Internet connection estabilished after: " + t + " seconds.", logger.info)
+                output("Internet connection estabilished after: " + str(t) + " seconds.", logger.info)
                 return
             except urllib2.URLError:
                 time.sleep(10)
@@ -748,6 +751,7 @@ def main():
                 try:
                     i.close()
                     i.open()
+                    i.send('\r\n')
                     i.read()
                     break
                 except SerialError, e:
