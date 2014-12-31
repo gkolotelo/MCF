@@ -40,7 +40,7 @@ from serialsensor import *
 
 # Global Variables:
 # Version number
-version = "1.1 Build 10"
+version = "1.1 Build 11"
 # Variable to count the number of data points sent
 counter = 0
 # Board's hostname
