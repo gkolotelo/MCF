@@ -5,7 +5,7 @@ from serial.tools.list_ports import comports
 import traceback
 import sys
 
-SerialSensor_version = "1.1 Build 5"
+SerialSensor_version = "1.1 Build 7"
 
 CRLF = 0
 CR = 1
@@ -138,7 +138,7 @@ class SerialSensor:
 
     def send(self, command):
         if not self.__connection.isOpen():
-            raise SerialError("Could not connect to serial device -> Connection closed.", self.__name, self.__serial_port, 0, 'readRaw()', source_exc_info=sys.exc_info())
+            raise SerialError("Could not connect to serial device -> Connection closed.", self.__name, self.__serial_port, 0, 'send()', source_exc_info=sys.exc_info())
         try:
             self.__connection.flushInput()
             time.sleep(0.15)
@@ -161,38 +161,16 @@ class SerialSensor:
             raise SerialError("Could not connect to serial device -> OSError.", self.__name, self.__serial_port, 5, 'send()', "write() call", source_exc_info=sys.exc_info())
 
     def readRaw(self):
-        """readRaw() reads the serial buffer as ASCII characters up to a Carriage Return or Line Feed.
-        If no characters are read, a SerialError (Error #3) is raised. If no EOL character
-        is received, a SerialError (Error #6) is raised.
-        String returned ends with CR or LF, but never CRLF.
+        """readRaw() reads all the available serial buffer as ASCII characters and returns it,
+        while handling the errors that might occur.
         """
+        string = ''
         if not self.__connection.isOpen():
             raise SerialError("Could not connect to serial device -> Connection closed.", self.__name, self.__serial_port, 0, 'readRaw()', source_exc_info=sys.exc_info())
         try:
-            buff = self.__connection.inWaiting()
-        except serial.SerialException, e:
-            raise SerialError("Failed reading serial device -> SerialException.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call " + e.message, source_exc_info=sys.exc_info())
-        except termios.error:
-            raise SerialError("Could not connect to serial device, TERMIOS error.", self.__name, self.__serial_port, 5, 'readRaw()', "inWaiting() call", source_exc_info=sys.exc_info())
-        except IOError:
-            raise SerialError("Could not connect to serial device, IOError.", self.__name, self.__serial_port, 5, 'readRaw()', "inWaiting() call", source_exc_info=sys.exc_info())
-        except OSError:
-            raise SerialError("Could not connect to serial device -> OSError.", self.__name, self.__serial_port, 5, 'readRaw()', "inWaiting() call", source_exc_info=sys.exc_info())
-        except Exception, e:
-            raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call, Error: " + str(e), source_exc_info=sys.exc_info())
-        if buff == 0:
-            raise SerialError("No data read -> No data on receive buffer.", self.__name, self.__serial_port, 3, 'readRaw()', source_exc_info=sys.exc_info())
-        try:
-            string = ""
-            char = ''
-            while char != '\r' and char != '\n':
-                if self.__connection.inWaiting() == 0:
-                    raise SerialError("Did not receive EOL character, assuming corrupted data.", self.__name, self.__serial_port, 6, 'readRaw()', 'Last character received: "' + char + '"', source_exc_info=sys.exc_info())
-                time.sleep(0.01)
-                char = self.__connection.read(1)
-                time.sleep(0.01)
-                string += char
+            string = self.__connection.read(self.__connection.inWaiting())
             self.__last_read_string = string
+            return string
         except serial.SerialTimeoutException:
             raise SerialError("Timeout on device -> SerialTimeoutException.", self.__name, self.__serial_port, 0, 'readRaw()', source_exc_info=sys.exc_info())
         except serial.SerialException, e:
@@ -205,18 +183,77 @@ class SerialSensor:
             raise SerialError("Could not connect to serial device -> OSError.", self.__name, self.__serial_port, 5, 'readRaw()', source_exc_info=sys.exc_info())
         except Exception, e:
             raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'readRaw()', "Error: " + str(e), source_exc_info=sys.exc_info())
-        return string
+
+
+    #def readRaw_old(self):
+    #    """readRaw() reads the serial buffer as ASCII characters up to a Carriage Return or Line Feed.
+    #    If no characters are read, a SerialError (Error #3) is raised. If no EOL character
+    #    is received, a SerialError (Error #6) is raised.
+    #    String returned ends with CR or LF, but never CRLF.
+    #    """
+    #    if not self.__connection.isOpen():
+    #        raise SerialError("Could not connect to serial device -> Connection closed.", self.__name, self.__serial_port, 0, 'readRaw()', source_exc_info=sys.exc_info())
+    #    try:
+    #        buff = self.__connection.inWaiting()
+    #    except serial.SerialException, e:
+    #        raise SerialError("Failed reading serial device -> SerialException.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call " + e.message, source_exc_info=sys.exc_info())
+    #    except termios.error:
+    #        raise SerialError("Could not connect to serial device, TERMIOS error.", self.__name, self.__serial_port, 5, 'readRaw()', "inWaiting() call", source_exc_info=sys.exc_info())
+    #    except IOError:
+    #        raise SerialError("Could not connect to serial device, IOError.", self.__name, self.__serial_port, 5, 'readRaw()', "inWaiting() call", source_exc_info=sys.exc_info())
+    #    except OSError:
+    #        raise SerialError("Could not connect to serial device -> OSError.", self.__name, self.__serial_port, 5, 'readRaw()', "inWaiting() call", source_exc_info=sys.exc_info())
+    #    except Exception, e:
+    #        raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'readRaw()', "inWaiting() call, Error: " + str(e), source_exc_info=sys.exc_info())
+    #    if buff == 0:
+    #        raise SerialError("No data read -> No data on receive buffer.", self.__name, self.__serial_port, 3, 'readRaw()', source_exc_info=sys.exc_info())
+    #    try:
+    #        string = ""
+    #        char = ''
+    #        while char != '\r' and char != '\n':
+    #            if self.__connection.inWaiting() == 0:
+    #                raise SerialError("Did not receive EOL character, assuming corrupted data.", self.__name, self.__serial_port, 6, 'readRaw()', 'Last character received: "' + char + '"', source_exc_info=sys.exc_info())
+    #            time.sleep(0.01)
+    #            char = self.__connection.read(1)
+    #            time.sleep(0.01)
+    #            string += char
+    #        self.__last_read_string = string
+    #    except serial.SerialTimeoutException:
+    #        raise SerialError("Timeout on device -> SerialTimeoutException.", self.__name, self.__serial_port, 0, 'readRaw()', source_exc_info=sys.exc_info())
+    #    except serial.SerialException, e:
+    #        raise SerialError("Failed reading serial device -> SerialException.", self.__name, self.__serial_port, 0, 'readRaw()', e.message, source_exc_info=sys.exc_info())
+    #    except termios.error:
+    #        raise SerialError("Could not connect to serial device -> TERMIOS error.", self.__name, self.__serial_port, 5, 'readRaw()', source_exc_info=sys.exc_info())
+    #    except IOError:
+    #        raise SerialError("Could not connect to serial device -> IOError.", self.__name, self.__serial_port, 5, 'readRaw()', source_exc_info=sys.exc_info())
+    #    except OSError:
+    #        raise SerialError("Could not connect to serial device -> OSError.", self.__name, self.__serial_port, 5, 'readRaw()', source_exc_info=sys.exc_info())
+    #    except Exception, e:
+    #        raise SerialError("Unhandled error.", self.__name, self.__serial_port, 0, 'readRaw()', "Error: " + str(e), source_exc_info=sys.exc_info())
+    #    return string
 
 
 #    def read_hex(self):
 #        string = self.readRaw()
 
     def readString(self, mode=CRLF):  # Available modes CRLF, LF, CR
+        """
+        readString(mode) calls readRaw() and conditions the string.
+        If the string is empty, a SerialError (Error #3) is raised.
+        If no EOL character is received, a SerialError (Error #6) is raised.
+        EOL from original string gets replace by EOL set in the mode option.
+        """
         string = self.readRaw()
-        if string.find('\r') == -1:
-            string = ""
+        if len(string.replace('\r', '').replace('\n', '')) == 0:
+            raise SerialError("No data read -> No data on receive buffer.", self.__name, self.__serial_port, 3, 'readString()')
+        cr = string.find('\r')
+        lf = string.find('\n')
+        if cr != -1:
+            string = string[:cr]
+        elif lf != -1:
+            string = string[:lf]
         else:
-            string = string[:string.find('\r')]
+            raise SerialError("Did not receive EOL character, assuming corrupted data.", self.__name, self.__serial_port, 6, 'readString()', 'String received: "' + string + '"', source_exc_info=sys.exc_info())
         if mode == CR:
             string += '\r'
         elif mode == LF:
@@ -271,8 +308,6 @@ class SerialSensor:
 #        elif errno == 5:
 #            pass
 
-
-
     def readValues(self):
         string = self.readString(CRLF)[:-2]
         string = string.replace(' ', '')
@@ -282,7 +317,7 @@ class SerialSensor:
         try:
             values = [float(i) for i in val_list]
         except ValueError:
-            raise SerialError("Invalid data type received -> Cannot convert to float.", self.__name, self.__serial_port, 2, 'readValues()', 'Invalid string: "' + self.__last_read_string + '"', source_exc_info=sys.exc_info())
+            raise SerialError("Invalid data type received -> Cannot convert to float.", self.__name, self.__serial_port, 2, 'readValues()', 'Invalid raw string: "' + string + '"', source_exc_info=sys.exc_info())
         return values
 
     def readJSON(self):
@@ -300,13 +335,13 @@ class SerialSensor:
             json_dict.update({names[i]: {"value": values[i], "units": units[i]}})
         return json_dict
 
-    def read(self, force_command=None):
+    def read(self, forced_command=None):
         # self.close()  # Make sure it's closed, so no errors are thrown
         # self.open()
-        if force_command is None:
+        if forced_command is None:
             command = self.__read_command
         else:
-            command = force_command
+            command = forced_command
         if command is None:
             raise SerialError("Invalid Data Type -> No read_command set, nothing to send.", self.__name, self.__serial_port, 2, 'read()', source_exc_info=sys.exc_info())
         if callable(command):
