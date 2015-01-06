@@ -473,14 +473,14 @@ def waitForInternet(wait):
     """
     try:
             urllib2.urlopen('http://74.125.228.100', timeout=5)  # Google
-            output("Internet connection estabilished\n", logger.info)
+            output("Internet connection established\n", logger.info)
     except urllib2.URLError:
         t = 0
         output("Waiting up to: " + str(wait) + " seconds for connection...", logger.info)
         while t < wait:
             try:
                 urllib2.urlopen('http://74.125.228.100', timeout=5)  # change this to connect to server (if on intranet)
-                output("Internet connection estabilished after: " + str(t) + " seconds.", logger.info)
+                output("Internet connection established after: " + str(t) + " seconds.", logger.info)
                 return
             except urllib2.URLError:
                 time.sleep(10)
@@ -824,11 +824,11 @@ def main():
             while j <= timeout:
                 try:
                     client.database_names()  # try to reconnect
-                    output("Connection restabilished. Continuing...", logger.info)
+                    output("Connection restablished. Continuing...", logger.info)
                     j = timeout
                 except pymongo.errors.AutoReconnect, e:
                     if j == timeout:
-                        output("Connection to database could not be restabilished. Now exiting...", logger.exception)
+                        output("Connection to database could not be restablished. Now exiting...", logger.exception)
                         quit()
                     time.sleep(30)
                 j += 1
