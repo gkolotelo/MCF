@@ -1,4 +1,4 @@
 #!/bin/bash
 
-sleep 25
+sleep 30
 /root/RPi/rpi_service.py

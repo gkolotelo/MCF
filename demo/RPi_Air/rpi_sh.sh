@@ -1,4 +1,4 @@
 #!/bin/bash
 
-sleep 25
+sleep 30
 /root/RPi_Air/rpi_service.py
