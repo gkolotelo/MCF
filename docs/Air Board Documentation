@@ -34,7 +34,11 @@ The Air Board's Arduino is programmed to work with the SerialSensor library, and
 Serial Commands:
 ----------------
 
-	``r\r``: Returns the measurement values after 10 seconds. After each reading the LED strip color is set according to the thresholds.
+	``r\r``: Returns the measurement values after 5 seconds. After each reading the LED strip color is set according to the thresholds.
+		The default order of the measurements is:
+			“CO2, Light, UV, IR, O2, Water_Temperature, Temperature, CO2_Temperature, Humidity, CO2_Humidity, Dust”
+		With the following units:
+			“ppm, N/A, Index, N/A, percent, C, C, C, RH, RH, N/A”
 
 	``i\r``: Returns information about the Air Board.
 
