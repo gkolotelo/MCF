@@ -17,7 +17,8 @@ Attributes:
     log_path (str): Path to the log file, appended to old_log_path, then cleared.
     old_log_path (str): Path to the old log file, where current logs are appended to.
     config_path (str): Path to the config file.
-    client (MongoClient): DB Client object.
+    globalDBClient (MongoClient): DB Client object.
+    settings (dict): Holds the current settings file.
 
 """
 
@@ -38,9 +39,14 @@ import os
 from serialsensor import *
 
 
-# Global Variables:
+#########################################################################################
+#                                                                                       #
+#                                    Global variables:                                  #
+#                                                                                       #
+#########################################################################################
+
 # Version number
-version = "1.1 Build 16"
+version = "1.1 Build 18"
 # Variable to count the number of data points sent
 counter = 0
 # Board's hostname
@@ -52,9 +58,30 @@ log_path = base_path + 'log.log'
 old_log_path = base_path + 'old_log.log'
 config_path = base_path + 'config.json'
 # DB Client
-client = None
+globalDBClient = None
 # Settings
 settings = None
+
+
+#########################################################################################
+#                                                                                       #
+#                       Function definitions:                                           #
+#                           - Logging related methods                                   #
+#                           - Auxiliary methods                                         #
+#                           - Database related methods                                  #
+#                           - Settings related methods                                  #
+#                           - Serial ports and sensor related methods                   #
+#                           - Initialization routine                                    #
+#                           - Main execution routine                                    #
+#                                                                                       #
+#########################################################################################
+
+
+#########################################################################################
+#                                                                                       #
+#                                 Logging related methods:                              #
+#                                                                                       #
+#########################################################################################
 
 
 # Initializes logger
@@ -92,22 +119,73 @@ if (os.getuid() != 0):
     sys.exit(0)
 
 
+#########################################################################################
+#                                                                                       #
+#                                   Auxiliary methods:                                  #
+#                                                                                       #
+#########################################################################################
+
+
+def waitForInternet(wait):
+    """
+    Wait for internet connection for a given amount of time.
+
+    Notes:
+        Exits after timeout.
+
+    Args:
+        wait (int): Time to keep waiting for internet connection.
+    """
+    try:
+            urllib2.urlopen('http://74.125.228.100', timeout=5)  # Google
+            output("Internet connection established\n", logger.info)
+    except urllib2.URLError:
+        t = 0
+        output("Waiting up to: " + str(wait) + " seconds for connection...", logger.info)
+        while t < wait:
+            try:
+                urllib2.urlopen('http://74.125.228.100', timeout=5)
+                # change this to connect to server (if on intranet)
+                output("Internet connection established after: " + str(t) + " seconds.", logger.info)
+                return
+            except urllib2.URLError:
+                time.sleep(10)
+            t += 15
+        output("No Internet connection, exiting...", logger.info)
+        quit()
+
+
+def output(message, log_func=None, verbose=True):
+    """
+    Outputs the message to stdio and/or log.
+
+    Args:
+        message (str): Message to be displayed.
+        log_func(logging object, optional): If provided, message is printed on logger provided (l.info/l.error).
+        verbose (bool, Default: False): If True, prints message to stdio.
+    """
+    if verbose:
+        print message
+    if log_func is not None:
+        log_func(message)
+
+
 # Override sys.excepthook to log unhandled exceptions (unhandled_exception_logger defined at the end)
 def unhandled_exception_logger(_type, _value, _traceback):
     # Logs unhandled exceptions
     try:
         settings['status']['value'] = "Exception"
-        saveSettingsToDB(settings, client, settings['_id'])
-        uploadLog(client, log_path, settings['_id'])
+        saveSettingsToDB(settings, settings['_id'])
+        uploadLog(log_path, settings['_id'])
     except:
         logger.exception("Error uploading log and settings:")
     logger.error("Uncaught unhandled exception: ", exc_info=(_type, _value, _traceback))
     print "Check errors in log"
     sys.exit(0)
 
-sys.excepthook = unhandled_exception_logger
 
-# Function definitions:
+# Sets system except hook to custom except hook defined above.
+sys.excepthook = unhandled_exception_logger
 
 
 def quit():
@@ -117,8 +195,8 @@ def quit():
         except:
             pass
         try:
-            saveSettingsToDB(settings, client, settings['_id'])
-            uploadLog(client, log_path, settings['_id'])
+            saveSettingsToDB(settings, settings['_id'])
+            uploadLog(log_path, settings['_id'])
         except:
             try:
                 logger.exception("Error uploading log and settings:")
@@ -134,107 +212,17 @@ def now():
     return(datetime.datetime.utcnow() - datetime.datetime(1970, 1, 1)).total_seconds()
 
 
-def initialize(path, hostname, version):
+#########################################################################################
+#                                                                                       #
+#                                 Database related methods:                             #
+#                                                                                       #
+#########################################################################################
+
+
+def DBConnect(server, username="", password=""):
     """
-    Initialization routine.
-    Initializes DB Client, and retrieves settings from DB and File for comparison.
-    If no settings are found on DB, file settings are pushed to DB, else, settings are pulled from DB
-    and saved to file.
-
-    Notes:
-        - File config is essentially used to push settings/sensor settings pattern to DB, and insert
-        already initialized settings to a new DB.
-        - The 'client' returned is a global variable (used to upload logs if outside main()).
-        - Exits script if cannot retrieve settings from DB after just inserting them.
-
-    Args:
-        path (str): Path to config file.
-        hostname (str): Board's hostname.
-        version (str): Board's version string (defined in the beginning)
-
-    Returns:
-        (settings, client) tuple. With the settings file to be used, and the DB client
-    """
-    file_settings = getSettingsFromFile(path)  # Get username, password and server
-    for j in xrange(3*60*60/15):  # 720 trials
-        try:
-            client = mongoConnect(file_settings['settings']['value']['server']['value'],
-                                  username=file_settings['settings']['value']['username']['value'],
-                                  password=file_settings['settings']['value']['password']['value']
-                                  )
-            break
-        except:
-            if j >= 3*60*60/15 - 1:
-                output("Could not connect to DB.", logger.error)
-                sys.exit(0)  # Don't bother with quit(), no connection anyway
-            else:
-                output("Trying again in 15 seconds.", logger.error)
-            time.sleep(15)
-
-    try:
-        Id = file_settings['_id']
-    except KeyError:
-        Id = None  # Using None as Id, No ID found on config file
-    settings = getSettingsFromDB(client, Id)
-    if settings is None or settings['changes']['date'] == "":
-        # No settings on server, or never saved, so
-        # board is new, or server is new, either way, push settings on file to DB
-        try:
-            file_settings.pop('_id')  # Remove _id, in case settings_file already has one
-        except KeyError:
-            pass
-        if file_settings['changes']['date'] == "":
-            # No 'date' -> Uninitialized board, wait for settings to be updated
-            output("Server and Board uninitialized, adding initial info...")
-            file_settings['version']['value'] = version
-            file_settings['status']['value'] = "Uninitialized, waiting for update..."
-            file_settings['settings']['value']['hostname']['value'] = hostname
-            file_settings['ip']['value'] = ip_address
-            Id = saveSettingsToDB(file_settings, client, None)  # Creates new entry and gets _id
-            db_settings = getSettingsFromDB(client, Id)
-            if db_settings is None:
-                output("Problem Saving/Retrieving settings during initialization.", logger.error)
-                quit()
-            saveSettingsToFile(db_settings, config_path)
-            output("Waiting for settings to be updated on the website, execution will resume once settings are updated...")
-            new_settings = checkUpdates(db_settings, client, Id, config_path)
-            while new_settings is None:
-                time.sleep(10)
-                new_settings = checkUpdates(db_settings, client, Id, config_path)
-            settings = new_settings
-            settings['status']['value'] = "Initialized"
-            saveSettingsToDB(settings, client, settings['_id'])
-            saveSettingsToFile(settings, path)
-
-        else:
-            output("Board has already been initialized, however server has not, saving settings on file to server...")
-            Id = saveSettingsToDB(file_settings, client, None)
-            settings = getSettingsFromDB(client, Id)  # get new _id
-            saveSettingsToFile(settings, config_path)
-
-    settings['version']['value'] = version
-    settings['settings']['value']['hostname']['value'] = hostname
-    settings['ip']['value'] = ip_address
-    settings['status']['value'] = "Running"
-    saveSettingsToFile(settings, path)
-    saveSettingsToDB(settings, client, settings['_id'])
-
-    # Check and update hostname:
-    if settings['settings']['value']['hostname']['value'] != hostname:
-        subprocess.check_output("hostnamectl set-hostname " + settings['settings']['value']['hostname']['value'], shell=True)
-        output("New hostname set to: " + settings['settings']['value']['hostname']['value'] + "  Rebooting board.")
-        os.system("systemctl reboot")
-        sys.exit(0)
-
-    output("\nUsing settings from DB\n")
-    uploadLog(client, log_path, settings['_id'])
-
-    return settings, client
-
-
-def mongoConnect(server, username="", password=""):
-    """
-    Connects and authenticates to the server if username provided.
+    Connects and authenticates to the Mongo DB on the specified server.
+    Uses authentication if username provided.
 
     Notes:
         Authentication uses the 'admin' database.
@@ -261,43 +249,152 @@ def mongoConnect(server, username="", password=""):
         raise
 
 
-def insertData(data, client, settings):
+def insertReading(data, settings):
     """
     Inserts data point to DB and Collection defined in settings.
 
     Args:
         data(JSON serializable dict): Data point.
-        client (MongoClient): MongoDB Client object
         settings (dict): Current settings dictionary.
     """
-    client[settings['settings']['value']['db_name']['value']][settings['settings']['value']['collection_name']['value']].insert(data)
+    return insertData(data,
+                      settings['settings']['value']['db_name']['value'],
+                      settings['settings']['value']['collection_name']['value']
+                      )
 
 
-# # Parse json file into simple dictionary
-# def parseSettings(settings_json):
-#     # settings has:
-#     # status
-#     # settings {}
-#     # changes
-#     # sensors []
-#     # ip
-#     # version
-#     if settings_json is None:
-#         return None
-#     settings = {}
-#     for key in settings_json.keys():
-#         # Only keep values
-#         if isinstance(settings_json[key]['value'], dict):
-#             settings[key] = parseSettings(settings_json[key]['value'])
-#         elif isinstance(settings_json[key]['value'], list):
-#             for i in settings_json[key]['value']:
-#                 settings.setdefault(key, []).append(parseSettings(i))
-#         else:
-#             settings[key] = settings_json[key]['value']
-#     return settings
+def insertData(data, db, collection):
+    """
+    Inserts data point on the 'collection' collection at the 'db' database on the globalDBClient.
+
+    Args:
+        data (JSON serializable dict): Data point.
+        db (str): Database where 'data' will be inserted.
+        collection (str): Collection where 'data' will be inserted.
+    """
+    try:
+        return globalDBClient[db][collection].insert(data)
+    except pymongo.errors.OperationFailure:
+        output("Error saving data to DB", logger.error)
+        return None
 
 
-def checkUpdates(current_settings, client, Id, path):
+def updateData(key, data, db, collection):
+    """
+    Tries to update 'key' on the 'collection' collection at the 'db' database on the globalDBClient with
+    'data' if not found, insert new.
+
+    Args:
+        key (string or ObjectId): Key used to find the document in the collection.
+        data (JSON serializable dict): Data point.
+        db (str): Database where 'key' will be compared and 'data' will be inserted.
+        collection (str): Collection where 'key' will be compared and 'data' will be inserted.
+    """
+    try:
+        if not globalDBClient[db][collection].update({'_id': ObjectId(key)}, data)['updatedExisting']:
+            # Id not found, create new entry
+            return globalDBClient[db][collection].insert(data)  # return _id
+        else:
+            return True
+    except pymongo.errors.OperationFailure:
+        output("Error saving data to DB", logger.error)
+        return None
+
+
+def getData(key, db, collection):
+    """
+    Gets data from the 'collection' collection at the 'db' database on the globalDBClient.
+
+    Args:
+        key (string or ObjectId): Key used to find the document in the collection.
+        db (str): Database where 'key' will be compared.
+        collection (str): Collection where 'key' will be compared.
+    """
+    try:
+        return globalDBClient[db][collection].find_one({'_id': ObjectId(key)})
+    except pymongo.errors.OperationFailure:
+        output("Error getting data from DB", logger.error)
+        return None
+
+
+def updateConfigData(key, data):
+    """
+    Tries to update 'key' on the 'boards' collection at the 'admin' database on the globalDBClient with
+    'data' if not found, insert new.
+
+    If another database or collection is to be used to store settings change the values below. Note that the
+    web_management interface also depends on these values.
+
+    Args:
+        key (string or ObjectId): Key used to find the document in the collection.
+        data (JSON serializable dict): Data point.
+    """
+    if key is None:
+        # Insert new entry:
+        return insertData(data, 'admin', 'boards')
+    return updateData(key, data, 'admin', 'boards')
+
+
+def updateLogData(key, text):
+    """
+    Tries to update 'key' on the 'log' collection at the 'admin' database on the globalDBClient with
+    'text', if not found, insert new with 'key' Id.
+
+    If another database or collection is to be used to store logs change the values below. Note that the
+    web_management interface also depends on these values.
+
+    Args:
+        key (string or ObjectId): Key used to find the document in the collection.
+        text (str): Log file as string.
+    """
+    data = {'_id': ObjectId(key), 'contents': text}  # Force use of a specific Id if inserting new entry.
+    return updateData(key, data, 'admin', 'log')
+
+
+def getConfigData(key):
+    """
+    Gets data from the 'boards' collection at the 'admin' database on the globalDBClient.
+
+    If another database or collection is to be used to store settings change the values below. Note that the
+    web_management interface also depends on these values.
+
+    Args:
+        key (string or ObjectId): Key used to find the document in the collection.
+    """
+    return getData(key, 'admin', 'boards')
+
+
+def getDBCount(db, collection):
+    """
+    Gets the number of data points in a given 'collection' at a given 'db'.
+
+    Args:
+        db (str): Database which has the collection from where the number of data points will be returned.
+        collection (str): Collection from where the number of data points will be returned.
+    """
+    return globalDBClient[db][collection].count()
+
+
+#########################################################################################
+#                                                                                       #
+# Note:                                                                                 #
+#    Although all DB operations have been abstracted using the methods above, if the    #
+#    connection is lost, a pyMongo error will be thrown and, currently, this is handled #
+#    in the main() routine (handler: 'except pymongo.errors.AutoReconnect').            #
+#    This exception handler must be changed in order to support non-pyMongo database    #
+#    clients.                                                                           #
+#                                                                                       #
+#########################################################################################
+
+
+#########################################################################################
+#                                                                                       #
+#                                Settings related methods:                              #
+#                                                                                       #
+#########################################################################################
+
+
+def checkUpdates(current_settings, Id, path):
     """
     Checks settings on DB for updates, and updates file and running settings.
 
@@ -306,7 +403,6 @@ def checkUpdates(current_settings, client, Id, path):
 
     Args:
         current_settings (dict): current settings dictionary
-        client (MongoClient): MongoDB Client object
         Id (str or ObjectId): Board Id, corresponding to settings/log entry Id on database
         path (str): Path to config file
 
@@ -316,7 +412,7 @@ def checkUpdates(current_settings, client, Id, path):
         False if it was not possible to retrieve settings from DB
 
     """
-    db_settings = getSettingsFromDB(client, Id)
+    db_settings = getSettingsFromDB(Id)
     if db_settings is None:
         # Could not retrieve settings from db, deleted?
         output("Problem retrieving settings from DB. Board may have been deleted from server", logger.error)
@@ -330,37 +426,11 @@ def checkUpdates(current_settings, client, Id, path):
     except:
         db_date = 0
     if curr_date < db_date:
-        output("New settings found on DB, updating...", logger.info)
+        output("\n\nNew settings found on DB, updating...", logger.info)
         saveSettingsToFile(db_settings, path)
-        # updateSettings(db_settings)  # settings is now equal to db_setings
         output("New settings updated.", logger.info)
         return db_settings
     return None
-
-
-def uploadLog(client, log_path, Id):
-    """
-    Uploads the current log to the database.
-
-    Notes:
-        Log is uploaded to the 'admin' database on the 'log' collection by default.
-
-    Args:
-        client (MongoClient): MongoDB Client object
-        log_path (str): Path to log file
-        Id (str or ObjectId): Board Id, corresponding to settings/log entry Id on database
-
-    """
-    # Uploads only current log
-    try:
-        with open(log_path) as log_file:
-            text = log_file.read()
-            if not client['admin']['log'].update({'_id': ObjectId(Id)},
-                                                 {'_id': ObjectId(Id), 'contents': text}
-                                                 )['updatedExisting']:
-                client['admin']['log'].insert({'_id': ObjectId(Id), 'contents': text})
-    except:
-        output("Error uploading log, ignoring...", logger.error)
 
 
 def saveSettingsToFile(settings, path):
@@ -379,7 +449,7 @@ def saveSettingsToFile(settings, path):
         output("Cannot write to file. Continuing without saving...", logger.error)
 
 
-def saveSettingsToDB(settings, client, Id):
+def saveSettingsToDB(settings, Id):
     """
     Saves the settings file to the database, given an Id.
 
@@ -388,7 +458,6 @@ def saveSettingsToDB(settings, client, Id):
 
     Args:
         settings (dict): Settings dictionary to be saved.
-        client (MongoClient): MongoDB Client object.
         Id (str or ObjectId): Board Id, corresponding to settings entry Id on database.
 
     Returns:
@@ -397,16 +466,7 @@ def saveSettingsToDB(settings, client, Id):
     """
     if settings is None:
         return None
-    try:
-        if Id is None:
-            # New Board
-            return client['admin']['boards'].insert(settings)  # return _id
-        if not client['admin']['boards'].update({'_id': ObjectId(Id)}, settings)['updatedExisting']:
-            # Id not found, create new entry
-            return client['admin']['boards'].insert(settings)  # return _id
-    except pymongo.errors.OperationFailure:
-        output("Error saving settings to DB", logger.error)
-        return None
+    return updateConfigData(Id, settings)  # return _id
 
 
 def getSettingsFromFile(path):
@@ -436,75 +496,56 @@ def getSettingsFromFile(path):
             quit()
 
 
-def getSettingsFromDB(client, Id):
+def getSettingsFromDB(Id):
     """
     Gets settings disctionary from DB given an Id.
 
     Notes:
         - Settings and Log are retrieved to the 'admin' database on the 'boards' collection by default.
-        - Assumes client has already been authenticated to, if needed.
+        - Assumes globalDBClient has already been authenticated to, if needed.
 
     Args:
-        client (MongoClient): MongoDB Client object.
         Id (str or ObjectId): Board Id, corresponding to settings entry Id on database.
 
     Returns:
         Settings dictionary, if found.
         None, if not found, if 'Id' is None, or error.
     """
-    try:
-        if Id is None:
-            return None
-        return client['admin']['boards'].find_one({'_id': ObjectId(Id)})
-    except pymongo.errors.OperationFailure:
-        output("Error getting settings to DB", logger.error)
+    if Id is None:
         return None
+    return getConfigData(Id)
 
 
-def waitForInternet(wait):
+def uploadLog(log_path, Id):
     """
-    Wait for internet connection for a given amount of time.
+    Uploads the current log to the database.
 
     Notes:
-        Exits after timeout.
+        Log is uploaded to the 'admin' database on the 'log' collection by default.
 
     Args:
-        wait (int): Time to keep waiting for internet connection.
+        log_path (str): Path to log file
+        Id (str or ObjectId): Board Id, corresponding to settings/log entry Id on database
+
     """
+    # Uploads only current log
     try:
-            urllib2.urlopen('http://74.125.228.100', timeout=5)  # Google
-            output("Internet connection established\n", logger.info)
-    except urllib2.URLError:
-        t = 0
-        output("Waiting up to: " + str(wait) + " seconds for connection...", logger.info)
-        while t < wait:
-            try:
-                urllib2.urlopen('http://74.125.228.100', timeout=5)  # change this to connect to server (if on intranet)
-                output("Internet connection established after: " + str(t) + " seconds.", logger.info)
-                return
-            except urllib2.URLError:
-                time.sleep(10)
-            t += 15
-        output("No Internet connection, exiting...", logger.info)
-        quit()
+        with open(log_path) as log_file:
+            text = log_file.read()
+            if updateLogData(Id, text) is None:
+                output("Error uploading log, ignoring...", logger.error)
+    except:
+        output("Error opening log file, ignoring...", logger.error)
+        raise
 
 
-def output(message, log_func=None, verbose=True):
-    """
-    Outputs the message to stdio and/or log.
+#########################################################################################
+#                                                                                       #
+#                       Serial ports and sensor related methods:                        #
+#                                                                                       #
+#########################################################################################
 
-    Args:
-        message (str): Message to be displayed.
-        log_func(logging object, optional): If provided, message is printed on logger provided (l.info/l.error).
-        verbose (bool, Default: False): If True, prints message to stdio.
-    """
-    if verbose:
-        print message
-    if log_func is not None:
-        log_func(message)
-
-
-def matchSerialPorts(settings, client, path):
+def matchSerialPorts(settings, path):
     """
     Matches the available tty ports in the '/dev/' path to the paths in the settings file. If all
     paths from the settings file cannot be matched, exit.
@@ -517,7 +558,6 @@ def matchSerialPorts(settings, client, path):
 
     Args:
         settings (dict): Settings dictionary to be used for matching. Paths can be of sysfs or '/dev/ttyUSBx' type.
-        client (MongoClient): MongoDB Client object.
         path (str): Path to config file.
     """
     available_ports = listPorts()
@@ -543,7 +583,7 @@ def matchSerialPorts(settings, client, path):
         #  Add syspaths to config file, and push to server:
         output("Updated syspaths", logger.info)
         saveSettingsToFile(settings, path)
-        saveSettingsToDB(settings, client, settings['_id'])
+        saveSettingsToDB(settings, settings['_id'])
 
 
 def getTTYFromPath(path):
@@ -653,13 +693,125 @@ def instantiateSensors(sensors_list):
     return sensors
 
 
+#########################################################################################
+#                                                                                       #
+#                                 Initialization routine:                               #
+#                                                                                       #
+#########################################################################################
+
+
+def initialize(path, hostname, version):
+    """
+    Initialization routine.
+    Initializes DB Client, and retrieves settings from DB and File for comparison.
+    If no settings are found on DB, file settings are pushed to DB, else, settings are pulled from DB
+    and saved to file.
+
+    Notes:
+        - File config is essentially used to push settings/sensor settings pattern to DB, and insert
+        already initialized settings to a new DB.
+        - Exits script if cannot retrieve settings from DB after just inserting them.
+
+    Args:
+        path (str): Path to config file.
+        hostname (str): Board's hostname.
+        version (str): Board's version string (defined in the beginning)
+
+    Returns:
+        settings dictionary.
+    """
+    global globalDBClient
+
+    file_settings = getSettingsFromFile(path)  # Get username, password and server
+    for j in xrange(3*60*60/15):  # 720 trials
+        try:
+            globalDBClient = DBConnect(file_settings['settings']['value']['server']['value'],
+                                       username=file_settings['settings']['value']['username']['value'],
+                                       password=file_settings['settings']['value']['password']['value']
+                                       )
+            break
+        except:
+            if j >= 3*60*60/15 - 1:
+                output("Could not connect to DB.", logger.error)
+                sys.exit(0)  # Don't bother with quit(), no connection anyway
+            else:
+                output("Trying again in 15 seconds.", logger.error)
+            time.sleep(15)
+
+    try:
+        Id = file_settings['_id']
+    except KeyError:
+        Id = None  # Using None as Id, No ID found on config file
+    settings = getSettingsFromDB(Id)
+    if settings is None or settings['changes']['date'] == "":
+        # No settings on server, or never saved, so
+        # board is new, or server is new, either way, push settings on file to DB
+        try:
+            file_settings.pop('_id')  # Remove _id, in case settings_file already has one
+        except KeyError:
+            pass
+        if file_settings['changes']['date'] == "":
+            # No 'date' -> Uninitialized board, wait for settings to be updated
+            output("Server and Board uninitialized, adding initial info...")
+            file_settings['version']['value'] = version
+            file_settings['status']['value'] = "Uninitialized, waiting for update..."
+            file_settings['settings']['value']['hostname']['value'] = hostname
+            file_settings['ip']['value'] = ip_address
+            Id = saveSettingsToDB(file_settings, None)  # Creates new entry and gets _id
+            db_settings = getSettingsFromDB(Id)
+            if db_settings is None:
+                output("Problem Saving/Retrieving settings during initialization.", logger.error)
+                quit()
+            saveSettingsToFile(db_settings, config_path)
+            output("Waiting for settings to be updated on the website, execution will resume once settings are updated...")
+            new_settings = checkUpdates(db_settings, Id, config_path)
+            while new_settings is None:
+                time.sleep(10)
+                new_settings = checkUpdates(db_settings, Id, config_path)
+            settings = new_settings
+            settings['status']['value'] = "Initialized"
+            saveSettingsToDB(settings, settings['_id'])
+            saveSettingsToFile(settings, path)
+
+        else:
+            output("Board has already been initialized, however server has not, saving settings on file to server...")
+            Id = saveSettingsToDB(file_settings, None)
+            settings = getSettingsFromDB(Id)  # get new _id
+            saveSettingsToFile(settings, config_path)
+
+    settings['version']['value'] = version
+    settings['settings']['value']['hostname']['value'] = hostname
+    settings['ip']['value'] = ip_address
+    settings['status']['value'] = "Running"
+    saveSettingsToFile(settings, path)
+    saveSettingsToDB(settings, settings['_id'])
+
+    # Check and update hostname:
+    if settings['settings']['value']['hostname']['value'] != hostname:
+        subprocess.check_output("hostnamectl set-hostname " + settings['settings']['value']['hostname']['value'], shell=True)
+        output("New hostname set to: " + settings['settings']['value']['hostname']['value'] + "  Rebooting board.")
+        os.system("systemctl reboot")
+        sys.exit(0)
+
+    output("\nUsing settings from DB\n")
+    uploadLog(log_path, settings['_id'])
+
+    return settings
+
+
+#########################################################################################
+#                                                                                       #
+#                                  Main execution routine:                              #
+#                                                                                       #
+#########################################################################################
+
+
 def main():
     global counter
-    global client
     global settings
 
     # initialization routine, and get new settings and DB client
-    settings, client = initialize(config_path, hostname, version)
+    settings = initialize(config_path, hostname, version)
 
     try:
         # log settings
@@ -682,12 +834,12 @@ def main():
         time.sleep(10)
         try:
             # Find and match serial ports:
-            matchSerialPorts(settings, client, config_path)
+            matchSerialPorts(settings, config_path)
         except:
             time.sleep(20)
             # If cannot match again, quit.
             try:
-                matchSerialPorts(settings, client, config_path)
+                matchSerialPorts(settings, config_path)
             except:
                 output("Exiting...", logger.error)
                 quit()
@@ -698,7 +850,7 @@ def main():
         except:
             output("Rebooting board due to exception while instantiating sensors...", logger.error)
             output(traceback.format_exc(), logger.error)
-            uploadLog(client, log_path, settings['_id'])
+            uploadLog(log_path, settings['_id'])
             os.system("systemctl reboot")
             sys.exit(0)
 
@@ -709,12 +861,14 @@ def main():
                    i.getUnits() + " , Waiting time: " + str(i.getWaitTime()) + 'ms', logger.info)
 
         output("Data points to date: " +
-               str(client[settings['settings']['value']['db_name']['value']]
-                   [settings['settings']['value']['collection_name']['value']].count()), logger.info)
+               str(getDBCount(settings['settings']['value']['db_name']['value'],
+                              settings['settings']['value']['collection_name']['value'])),
+               logger.info
+               )
 
         output("Reading Started...", logger.info)
     finally:
-        uploadLog(client, log_path, settings['_id'])
+        uploadLog(log_path, settings['_id'])
 
     # End of initialization
     # Start reading:
@@ -722,9 +876,9 @@ def main():
 
     while True:
 
-        new_settings = checkUpdates(settings, client, settings['_id'], config_path)
+        new_settings = checkUpdates(settings, settings['_id'], config_path)
 
-        uploadLog(client, log_path, settings['_id'])
+        uploadLog(log_path, settings['_id'])
 
         if new_settings is not None:
             if new_settings is False:
@@ -745,7 +899,7 @@ def main():
                 quit()
             counter += 1
             JSON_readings['date'] = now()
-            insertData(JSON_readings, client, settings)
+            insertReading(JSON_readings, settings)
             print counter
             print JSON_readings
             print '\n'
@@ -799,11 +953,11 @@ def main():
                             ports_still_same = False
                         if not ports_still_same:
                             output("\nReloading sensors due to exception. Ports have changed: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
-                            uploadLog(client, log_path, settings['_id'])
+                            uploadLog(log_path, settings['_id'])
                             return
                         else:
                             output("\nRebooting board, due to fault in: " + e.sensor + ' @ ' + e.port + ' errno ' + str(e.errno), logger.error)
-                            uploadLog(client, log_path, settings['_id'])
+                            uploadLog(log_path, settings['_id'])
                             os.system("systemctl reboot")
                             sys.exit(0)
                     else:
@@ -813,7 +967,7 @@ def main():
                 except:
                     output("\n\nRebooting board due to non SerialError fault in: " + e.sensor + ' @ ' + e.port + ', Errno ' + str(e.errno), logger.error)
                     output(traceback.format_exc(), logger.error)
-                    uploadLog(client, log_path, settings['_id'])
+                    uploadLog(log_path, settings['_id'])
                     os.system("systemctl reboot")
                     sys.exit(0)
 
@@ -823,7 +977,7 @@ def main():
             j = 0
             while j <= timeout:
                 try:
-                    client.database_names()  # try to reconnect
+                    globalDBClient.database_names()  # try to reconnect
                     output("Connection restablished. Continuing...", logger.info)
                     j = timeout
                 except pymongo.errors.AutoReconnect, e:
@@ -840,12 +994,12 @@ def main():
         except:
             output("\n\nRebooting board due to non Unhandled Exception in main while loop", logger.error)
             output(traceback.format_exc(), logger.error)
-            uploadLog(client, log_path, settings['_id'])
+            uploadLog(log_path, settings['_id'])
             os.system("systemctl reboot")
             sys.exit(0)
 
         finally:
-            uploadLog(client, log_path, settings['_id'])
+            uploadLog(log_path, settings['_id'])
 
 
 if __name__ == '__main__':
@@ -854,3 +1008,27 @@ if __name__ == '__main__':
     waitForInternet(60*60*5)
     while True:
         main()
+
+
+# # Parse json file into simple dictionary
+# def parseSettings(settings_json):
+#     # settings has:
+#     # status
+#     # settings {}
+#     # changes
+#     # sensors []
+#     # ip
+#     # version
+#     if settings_json is None:
+#         return None
+#     settings = {}
+#     for key in settings_json.keys():
+#         # Only keep values
+#         if isinstance(settings_json[key]['value'], dict):
+#             settings[key] = parseSettings(settings_json[key]['value'])
+#         elif isinstance(settings_json[key]['value'], list):
+#             for i in settings_json[key]['value']:
+#                 settings.setdefault(key, []).append(parseSettings(i))
+#         else:
+#             settings[key] = settings_json[key]['value']
+#     return settings
