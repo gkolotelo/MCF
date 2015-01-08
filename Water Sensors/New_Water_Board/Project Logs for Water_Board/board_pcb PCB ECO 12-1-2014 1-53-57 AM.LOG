@@ -1,0 +1,15 @@
+Change Component DesignItemId : Designator=D1 Old DesignItemId=LED-3MM-GENERIC New DesignItemId=LED0
+Change Component DesignItemId : Designator=D2 Old DesignItemId=LED-3MM-GENERIC New DesignItemId=LED0
+Change Component DesignItemId : Designator=D3 Old DesignItemId=LED-3MM-GENERIC New DesignItemId=LED0
+Change Component Footprint: Designator=D1 Old Footprint=LED-0 New Footprint=LED-3MM-BLUE
+Change Component Footprint: Designator=D2 Old Footprint=LED-0 New Footprint=LED-3MM-BLUE
+Change Component Footprint: Designator=D3 Old Footprint=LED-0 New Footprint=LED-3MM-BLUE
+Change Component Comment : Designator=D1 Old Comment=LED-3MM-GENERIC New Comment=LED0
+Change Component Comment : Designator=D2 Old Comment=LED-3MM-GENERIC New Comment=LED0
+Change Component Comment : Designator=D3 Old Comment=LED-3MM-GENERIC New Comment=LED0
+Added Pin To Net: NetName=NetD1_2 Pin=R5-2
+Added Net: Name=NetD1_2
+Added Pin To Net: NetName=NetD2_2 Pin=R4-1
+Added Net: Name=NetD2_2
+Added Pin To Net: NetName=NetD3_2 Pin=R3-1
+Added Net: Name=NetD3_2

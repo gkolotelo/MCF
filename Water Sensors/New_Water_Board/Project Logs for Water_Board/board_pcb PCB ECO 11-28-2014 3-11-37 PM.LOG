@@ -1,0 +1,21 @@
+Added Component: Designator=R6_U_isolator_3(0805R-10K)
+Added Component: Designator=R7_U_isolator_3(0805R-10K)
+Added Component: Designator=R8_U_isolator_3(0805R-10K)
+Added Component: Designator=R9_U_isolator_3(0805R-10K)
+Added Component: Designator=VR2_U_isolator_3(SOT23-123)
+Added Pin To Net: NetName=NetR6_U_isolator_3_1 Pin=R6_U_isolator_3-1
+Added Pin To Net: NetName=NetD1_2 Pin=R6_U_isolator_3-2
+Added Pin To Net: NetName=NetR7_U_isolator_3_1 Pin=R7_U_isolator_3-1
+Added Pin To Net: NetName=NetD1_2 Pin=R7_U_isolator_3-2
+Added Pin To Net: NetName=NetP7_3 Pin=R8_U_isolator_3-1
+Added Pin To Net: NetName=NetP8_1 Pin=R8_U_isolator_3-2
+Added Pin To Net: NetName=NetP7_2 Pin=R9_U_isolator_3-1
+Added Pin To Net: NetName=NetP8_1 Pin=R9_U_isolator_3-2
+Added Pin To Net: NetName=NetROE-1_U_isolator_3_4 Pin=VR2_U_isolator_3-1
+Added Pin To Net: NetName=NetP7_1 Pin=VR2_U_isolator_3-2
+Added Pin To Net: NetName=NetP8_1 Pin=VR2_U_isolator_3-3
+Added Member To Class: ClassName=U_isolator_3 Member=Component R6_U_isolator_3 (R6) Res1
+Added Member To Class: ClassName=U_isolator_3 Member=Component R7_U_isolator_3 (R7) Res1
+Added Member To Class: ClassName=U_isolator_3 Member=Component R8_U_isolator_3 (R8) Res1
+Added Member To Class: ClassName=U_isolator_3 Member=Component R9_U_isolator_3 (R9) Res1
+Added Member To Class: ClassName=U_isolator_3 Member=Component VR2_U_isolator_3 (VR2) Volt Reg

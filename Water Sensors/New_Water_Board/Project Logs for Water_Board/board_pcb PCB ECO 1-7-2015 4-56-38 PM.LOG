@@ -1,0 +1,4 @@
+Change Component Comment : Designator=U2 Old Comment=FT232R New Comment=FT232RL-Tray
+Change Component Comment : Designator=U1 Old Comment=FT4232 New Comment=FT4232HQ-Tray
+Change Component Comment : Designator=SI1_U_isolator_1 Old Comment=Si New Comment=Si8600AC-B-IS
+Added Member To Class: ClassName=U_isolator_1 Member=Component SI1_U_isolator_1 (SI1) Si8600AC-B-IS

@@ -1,0 +1,8 @@
+Removed Pin From Net: NetName=NetR7_U_isolator_2_1 Pin=U1-38
+Removed Pin From Net: NetName=NetR6_U_isolator_2_1 Pin=U1-39
+Removed Pin From Net: NetName=NetR7_U_isolator_3_1 Pin=U1-48
+Removed Pin From Net: NetName=NetR6_U_isolator_3_1 Pin=U1-52
+Added Pin To Net: NetName=NetR7_U_isolator_3_1 Pin=U1-38
+Added Pin To Net: NetName=NetR6_U_isolator_3_1 Pin=U1-39
+Added Pin To Net: NetName=NetR7_U_isolator_2_1 Pin=U1-48
+Added Pin To Net: NetName=NetR6_U_isolator_2_1 Pin=U1-52

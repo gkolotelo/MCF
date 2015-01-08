@@ -1,0 +1,16 @@
+Removed Pin From Net: NetName=NetD1_1 Pin=D1-1
+Removed Pin From Net: NetName=NetC15_U_isolator_1_2 Pin=D1-2
+Removed Pin From Net: NetName=NetD2_1 Pin=D2-1
+Removed Pin From Net: NetName=VCC_USB_2 Pin=D2-2
+Removed Pin From Net: NetName=NetD3_1 Pin=D3-1
+Removed Pin From Net: NetName=VCC_USB_1 Pin=D3-2
+Removed Pin From Net: NetName=NetD1_1 Pin=R3-1
+Removed Pin From Net: NetName=NetD3_1 Pin=R5-2
+Change Component Comment : Designator=D1 Old Comment=LED0 New Comment=LED-3MM-GENERIC
+Change Component Comment : Designator=D2 Old Comment=LED0 New Comment=LED-3MM-GENERIC
+Change Component Comment : Designator=D3 Old Comment=LED0 New Comment=LED-3MM-GENERIC
+Added Pin To Net: NetName=NetD3_1 Pin=R3-1
+Added Pin To Net: NetName=NetD1_1 Pin=R5-2
+Change Net Name : Old Net Name=NetD1_1 New Net Name=NetD3_K
+Change Net Name : Old Net Name=NetD2_1 New Net Name=NetD2_K
+Change Net Name : Old Net Name=NetD3_1 New Net Name=NetD1_K

@@ -1,0 +1,8 @@
+Change Component Designator: OldDesignator=VR?_U_isolator_1 NewDesignator=VR2_U_isolator_1
+Change Component Designator: OldDesignator=VR?_U_isolator_2 NewDesignator=VR2_U_isolator_2
+Change Component Designator: OldDesignator=VR?_U_isolator_3 NewDesignator=VR2_U_isolator_3
+Change Component Designator: OldDesignator=VR?_U_isolator_4 NewDesignator=VR2_U_isolator_4
+Added Member To Class: ClassName=U_isolator_1 Member=Component VR2_U_isolator_1 (VR2) Volt Reg
+Added Member To Class: ClassName=U_isolator_2 Member=Component VR2_U_isolator_2 (VR2) Volt Reg
+Added Member To Class: ClassName=U_isolator_3 Member=Component VR2_U_isolator_3 (VR2) Volt Reg
+Added Member To Class: ClassName=U_isolator_4 Member=Component VR2_U_isolator_4 (VR2) Volt Reg

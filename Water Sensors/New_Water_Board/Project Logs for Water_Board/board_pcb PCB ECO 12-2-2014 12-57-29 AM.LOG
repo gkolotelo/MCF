@@ -1,0 +1,14 @@
+Added Pin To Net: NetName=GND Pin=C15_U_isolator_1-1
+Added Pin To Net: NetName=GND Pin=C15_U_isolator_2-1
+Added Pin To Net: NetName=GND Pin=C15_U_isolator_3-1
+Added Pin To Net: NetName=GND Pin=C15_U_isolator_4-1
+Added Pin To Net: NetName=GND Pin=P13-2
+Added Pin To Net: NetName=GND Pin=ROE-1_U_isolator_1-1
+Added Pin To Net: NetName=GND Pin=ROE-1_U_isolator_2-1
+Added Pin To Net: NetName=GND Pin=ROE-1_U_isolator_3-1
+Added Pin To Net: NetName=GND Pin=ROE-1_U_isolator_4-1
+Added Pin To Net: NetName=GND Pin=RPI_Header1-6
+Added Pin To Net: NetName=GND Pin=SI1_U_isolator_1-4
+Added Pin To Net: NetName=GND Pin=SI1_U_isolator_2-4
+Added Pin To Net: NetName=GND Pin=SI1_U_isolator_3-4
+Added Pin To Net: NetName=GND Pin=SI1_U_isolator_4-4

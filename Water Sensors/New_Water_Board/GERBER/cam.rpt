@@ -1,0 +1,16 @@
+CAMtasticDXP Drill Report
+Serial Number:0000-00-00000
+Drill File: Z:\Documents\Programming\University\MIT\CityFARM\Water_Board\For Production\GERBER\cam.drl
+Format: 2.3
+Units: English (Inch)
+Step & Repeat Codes Used: NO
+
+
+TOOL		SIZE		COUNT
+====		======		=====
+
+ 1 		0.0200		43
+ 2 		0.0315		6
+ 3 		0.0400		6
+ 4 		0.0420		86
+ 5 		0.0787		8

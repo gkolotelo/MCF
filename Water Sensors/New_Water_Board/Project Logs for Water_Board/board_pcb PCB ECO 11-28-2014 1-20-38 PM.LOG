@@ -1,0 +1,10 @@
+Removed Member From Class: ClassName=U_isolator_1 Member=ROE-0505
+Removed Member From Class: ClassName=U_isolator_2 Member=ROE-0505
+Removed Member From Class: ClassName=U_isolator_3 Member=ROE-0505
+Change Component Designator: OldDesignator=ROE-0505 NewDesignator=ROE-1_U_isolator_1
+Change Component Designator: OldDesignator=ROE-0505 NewDesignator=ROE-1_U_isolator_2
+Change Component Designator: OldDesignator=ROE-0505 NewDesignator=ROE-1_U_isolator_3
+Change Component Designator: OldDesignator=ROE-0505 NewDesignator=ROE-1_U_isolator_4
+Added Member To Class: ClassName=U_isolator_1 Member=Component ROE-1_U_isolator_1 (ROE-1) U1
+Added Member To Class: ClassName=U_isolator_2 Member=Component ROE-1_U_isolator_2 (ROE-1) U1
+Added Member To Class: ClassName=U_isolator_3 Member=Component ROE-1_U_isolator_3 (ROE-1) U1

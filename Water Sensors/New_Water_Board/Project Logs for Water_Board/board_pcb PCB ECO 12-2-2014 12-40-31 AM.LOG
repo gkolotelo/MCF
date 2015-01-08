@@ -1,0 +1,2 @@
+Change Component Footprint: Designator=RPI_Header1 Old Footprint=HDR2X3 New Footprint=HDR2X13
+Added Member To Class: ClassName=U_serial_1 Member=Component C11 Cap

@@ -1,0 +1,8 @@
+Change Component DesignItemId : Designator=RPI_Header1 Old DesignItemId=Header 3X2 New DesignItemId=Header 13X2
+Change Component Comment : Designator=RPI_Header1 Old Comment=Header 3X2 New Comment=Header 13X2
+Change Component Description : Designator=RPI_Header1 Old Description=Header, 3-Pin, Dual row New Description=Header, 13-Pin, Dual row
+Added Pin To Net: NetName=NetC15_U_isolator_1_2 Pin=RPI_Header1-4
+Added Pin To Net: NetName=GND Pin=RPI_Header1-9
+Added Pin To Net: NetName=GND Pin=RPI_Header1-14
+Added Pin To Net: NetName=GND Pin=RPI_Header1-20
+Added Pin To Net: NetName=GND Pin=RPI_Header1-25

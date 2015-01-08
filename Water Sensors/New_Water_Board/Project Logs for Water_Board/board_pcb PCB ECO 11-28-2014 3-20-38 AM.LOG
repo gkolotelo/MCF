@@ -1,0 +1,4 @@
+Added Pin To Net: NetName=VCC_USB_1 Pin=C5-2
+Added Pin To Net: NetName=VCC_USB_2 Pin=C12-2
+Added Pin To Net: NetName=VCC_USB_2 Pin=L3-1
+Added Pin To Net: NetName=VCC_USB_1 Pin=VR1-1

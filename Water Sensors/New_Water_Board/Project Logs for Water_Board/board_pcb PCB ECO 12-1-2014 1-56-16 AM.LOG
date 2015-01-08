@@ -1,0 +1,27 @@
+Removed Pin From Net: NetName=NetD3_2 Pin=R3-1
+Removed Pin From Net: NetName=NetD2_2 Pin=R4-1
+Removed Pin From Net: NetName=NetD1_2 Pin=R5-2
+Change Component DesignItemId : Designator=D1 Old DesignItemId=LED0 New DesignItemId=LED-3MM-GENERIC
+Change Component DesignItemId : Designator=D2 Old DesignItemId=LED0 New DesignItemId=LED-3MM-GENERIC
+Change Component DesignItemId : Designator=D3 Old DesignItemId=LED0 New DesignItemId=LED-3MM-GENERIC
+Change Component Comment : Designator=D1 Old Comment=LED0 New Comment=LED-3MM-GENERIC
+Change Component Comment : Designator=D2 Old Comment=LED0 New Comment=LED-3MM-GENERIC
+Change Component Comment : Designator=D3 Old Comment=LED0 New Comment=LED-3MM-GENERIC
+Change Component Description : Designator=D1 Old Description=Typical INFRARED GaAs LED New Description=GENERIC LED 3MM
+Change Component Description : Designator=D2 Old Description=Typical INFRARED GaAs LED New Description=GENERIC LED 3MM
+Change Component Description : Designator=D3 Old Description=Typical INFRARED GaAs LED New Description=GENERIC LED 3MM
+Change Component Library : Designator=D1 Old Library=Miscellaneous Devices.IntLib New Library=vh_altium_library.intLib
+Change Component Library : Designator=D2 Old Library=Miscellaneous Devices.IntLib New Library=vh_altium_library.intLib
+Change Component Library : Designator=D3 Old Library=Miscellaneous Devices.IntLib New Library=vh_altium_library.intLib
+Added Pin To Net: NetName=NetC15_U_isolator_1_2 Pin=D1-A
+Added Pin To Net: NetName=NetD2_2 Pin=D1-K
+Added Pin To Net: NetName=VCC_USB_2 Pin=D2-A
+Added Pin To Net: NetName=NetD1_2 Pin=D2-K
+Added Pin To Net: NetName=VCC_USB_1 Pin=D3-A
+Added Pin To Net: NetName=NetD3_2 Pin=D3-K
+Added Pin To Net: NetName=NetD2_2 Pin=R3-1
+Added Pin To Net: NetName=NetD1_2 Pin=R4-1
+Added Pin To Net: NetName=NetD3_2 Pin=R5-2
+Change Net Name : Old Net Name=NetD1_2 New Net Name=NetD2_K
+Change Net Name : Old Net Name=NetD2_2 New Net Name=NetD1_K
+Change Net Name : Old Net Name=NetD3_2 New Net Name=NetD3_K
