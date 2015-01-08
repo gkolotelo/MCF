@@ -5,7 +5,7 @@ from serial.tools.list_ports import comports
 import traceback
 import sys
 
-SerialSensor_version = "1.1 Build 7"
+SerialSensor_version = "1.1 Build 8"
 
 CRLF = 0
 CR = 1
@@ -91,6 +91,12 @@ class SerialSensor:
             stopbits (int): Default 1
             timeout (int): Default 5 seconds
             writeTimeout (int): Default 5 seconds
+
+        Exceptions:
+            Handles SerialException, SerialTimeoutException, TERMIOS errors, I.OError and OSError, and returns
+            SerialErrors #0 (Cannot connect to device) or #5 (I/O Error).
+
+            If an Unknown exception is raised, SerialError #0 is raised.
         """
         self.__serial_port = serial_port
         self.__baud_rate = baud_rate
@@ -137,6 +143,18 @@ class SerialSensor:
 #            raise SerialError("Timeout on device", self.__name, self.__serial_port, 0, source_exc_info=sys.exc_info())
 
     def send(self, command):
+        """
+        Sends through the serial connection the string 'command' and returns nothing.
+
+        If no line ending (CR, LF or CRLF) is provided, the CR line ending ('\r') is appended to 'command' by default.
+
+        Args:
+            command (str): ASCII string to be sent through the serial connection.
+
+        Exceptions:
+            Handles SerialException, SerialTimeoutException, TERMIOS errors, IOError and OSError, and returns
+            SerialErrors #0 (Cannot connect to device) or #5 (I/O Error).
+        """
         if not self.__connection.isOpen():
             raise SerialError("Could not connect to serial device -> Connection closed.", self.__name, self.__serial_port, 0, 'send()', source_exc_info=sys.exc_info())
         try:
@@ -161,8 +179,14 @@ class SerialSensor:
             raise SerialError("Could not connect to serial device -> OSError.", self.__name, self.__serial_port, 5, 'send()', "write() call", source_exc_info=sys.exc_info())
 
     def readRaw(self):
-        """readRaw() reads all the available serial buffer as ASCII characters and returns it,
-        while handling the errors that might occur.
+        """
+        Reads all the available serial buffer as ASCII characters and returns it.
+
+        Exceptions:
+            Handles SerialException, SerialTimeoutException, TERMIOS errors, IOError and OSError, and returns
+            SerialErrors #0 (Cannot connect to device) or #5 (I/O Error).
+
+        If an Unknown exception is raised, SerialError #0 is raised.
         """
         string = ''
         if not self.__connection.isOpen():
@@ -238,10 +262,21 @@ class SerialSensor:
 
     def readString(self, mode=CRLF):  # Available modes CRLF, LF, CR
         """
-        readString(mode) calls readRaw() and conditions the string.
+        Calls readRaw() and conditions the string befor returning.
         If the string is empty, a SerialError (Error #3) is raised.
         If no EOL character is received, a SerialError (Error #6) is raised.
-        EOL from original string gets replace by EOL set in the mode option.
+        EOL from original string gets replaced by EOL set in the mode option.
+
+        Args:
+            mode (int): Line ending mode:
+                    0: CRLF
+                    1: CR
+                    2: LF
+
+        Exceptions:
+            Does not handle any exceptions.
+            Throws SerialError #3 if string received from readRaw() has zero lenght.
+            Throws SerialError #6 if no line ending character has been received, assumes that data has is corrupted.
         """
         string = self.readRaw()
         if len(string.replace('\r', '').replace('\n', '')) == 0:
@@ -309,6 +344,12 @@ class SerialSensor:
 #            pass
 
     def readValues(self):
+        """
+        Returns a float or a list of floats representing the numeric values in the string returned from readString().
+
+        Exceptions:
+            If there is a ValueError, readValues raises a SerialError #2 (Invalid Data Type).
+        """
         string = self.readString(CRLF)[:-2]
         string = string.replace(' ', '')
         if len(string) == 0:
@@ -317,10 +358,56 @@ class SerialSensor:
         try:
             values = [float(i) for i in val_list]
         except ValueError:
-            raise SerialError("Invalid data type received -> Cannot convert to float.", self.__name, self.__serial_port, 2, 'readValues()', 'Invalid raw string: "' + string + '"', source_exc_info=sys.exc_info())
+            raise SerialError("Invalid data type received -> Cannot convert to float.",
+                              self.__name, self.__serial_port,
+                              2,
+                              'readValues()',
+                              'Invalid string: "' + string + '"' + ', Original raw string: "' + self.__last_read_string + '"',
+                              source_exc_info=sys.exc_info()
+                              )
         return values
 
     def readJSON(self):
+        """
+        Returns a JSON dictionary with the measurements taken:
+
+            {'name1': {'units':'u1', 'value': '1.0'}, 'name2': {'units':'u3', 'value': '2.0'}, ...}
+
+        The "names" and "units" are single measurement names/units or comma separated names/units, like so:
+
+            names = "pH"  ;  units = "N/A"
+        or
+            names = "Temperature,Humidity,CO2"  ;  units = "C,RH,ppm"
+
+        And so, the number of comma separated names and units must be the same, so as to create the
+        corresponding pairs of name/unit/value, if the provided comma separated names and units are
+        not paired, readJSON() will pair the smallest number of either names or units provided.
+        Likewise, if the number of values available from readValues is smaller than the number of
+        either names or units provided, the measurements will be paired for only the available values.
+
+        Note that this can cause incorrect measurement values to be associated to names and units if
+        these have not been initialized properly and/or in the same order as the values are read from the
+        sensor, for example:
+
+            Sensor output:  "25.3,36.6,443"
+            measurements: Temperature in Celsius followed by Humidity in RH followed by CO2 in ppm.
+
+            values = [25.3, 36.6, 443]
+            names = "Temperature,Humidity,CO2"
+            units = "C,RH,ppm"
+
+            Final JSON dictionary:
+
+                {
+                "Temperature": {"value": 25.3, "units": "C"},
+                "Humidity": {"value": 36.6, "units": "RH"},
+                "CO2": {"value": 443, "units": "ppm"}
+                }
+
+            Note that names and units form their respective pairs in the same order as the values are read
+            from the sensor, as well as there are the same number of names, units and values available to
+            be paired, in this example, 3.
+        """
         names = self.getName().split(',')
         units = self.getUnits().split(',')
         values = self.readValues()
@@ -336,8 +423,22 @@ class SerialSensor:
         return json_dict
 
     def read(self, forced_command=None):
-        # self.close()  # Make sure it's closed, so no errors are thrown
-        # self.open()
+        """
+        Executes 3 commands in sequence:
+            1. Sends read_command to the serial device
+            2. Waits for wait_time milliseconds.
+            3. Reads and returns JSON dictionary of values, names and units.
+
+        Note that read_command must have been defined when the sensor was initialized.
+
+        Args:
+            forced_command (str or function): If set, forces read() to use the provided command in place of
+            the default read_command set when initialized.
+
+        Exceptions:
+            Raises SerialError #2 if read_command has not been defined when initialized.
+
+        """
         if forced_command is None:
             command = self.__read_command
         else:
@@ -353,15 +454,23 @@ class SerialSensor:
         # self.close()
         return reading
 
-    def getName(self):
-        return str(self.__name)
-
     def open(self):
+        """
+        Opens the serial connection.
+
+        Exceptions:
+            Handles SerialException, SerialTimeoutException, TERMIOS errors, IOError and OSError, and returns
+            SerialErrors #0 (Cannot connect to device) or #5 (I/O Error).
+
+            If an Unknown exception is raised, SerialError #0 is raised.
+        """
         try:
             self.__connection.open()
             time.sleep(0.4)
             self.__connection.flushInput()
             time.sleep(0.4)
+        except serial.SerialTimeoutException:
+            raise SerialError("Timeout on device -> SerialTimeoutException.", self.__name, self.__serial_port, 0, 'open()', source_exc_info=sys.exc_info())
         except SerialException, e:
             raise SerialError("Could not connect to serial device -> SerialException.", self.__name, self.__serial_port, 0, 'open()', e.message, source_exc_info=sys.exc_info())
         except termios.error:
@@ -376,34 +485,78 @@ class SerialSensor:
             raise SerialError("Unknown exception.", self.__name, self.__serial_port, 0, 'open()', source_exc_info=sys.exc_info())
 
     def close(self):
+        """
+        Closes the serial connection.
+        """
         self.__connection.close()
         time.sleep(0.2)
 
     def isEnabled(self):
+        """
+        Returns True if the 'enabled' flag is True, returns False otherwise.
+        """
         return self.__enabled
 
     def enable(self, enable):
+        """
+        Sets the 'enabled' flag.
+
+        Args:
+            enable (bool): Boolean value to which the 'enabled' flag will be set.
+        """
         self.__enabled = enable
 
+    def getName(self):
+        """
+        Returns string corresponding to the name of the sensor as defined during initialization.
+        """
+        return str(self.__name)
+
     def getPort(self):
+        """
+        Returns string corresponding to the port of the sensor as defined during initialization.
+        """
         return str(self.__serial_port)
 
     def getWaitTime(self):
+        """
+        Returns numeric value corresponding to the wait_time of the sensor as defined during initialization.
+        """
         return float(self.__wait_time)
 
     def getReadCommand(self):
-        return str(self.__read)
+        """
+        Returns string or function or None type (default) corresponding to the read_command of the sensor
+        as defined during initialization.
+        """
+        return self.__read_command
 
     def getBaud(self):
+        """
+        Returns numeric value corresponding to the baud_rate of the sensor as defined during initialization.
+        """
         return int(self.__baud_rate)
 
     def getUnits(self):
+        """
+        Returns string corresponding to the units of the sensor as defined during initialization.
+        """
         return str(self.__units)
 
     def getLastString(self):
+        """
+        Returns string corresponding to the last string read by readRaw().
+        """
         return str(self.__last_read_string)
 
     def getJSONSettings(self, _key="", _value=""):
+        """
+        Returns JSON dictionary with all of the arguments set during initialization.
+
+        Args:
+            _key (str) and _value (any): If set, this custom key/value entry will be included in the
+            dictionary that will be returned.
+        """
         if _key != "":
             return {"name": self.getName(), "units": self.getUnits(), "wait_time": self.getWaitTime(),
                     "baud_rate": self.getBaud(), "read_command": self.__read_command, _key: _value}
