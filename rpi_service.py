@@ -946,7 +946,7 @@ def main():
                     output("Exhausted maximum number of trials. Error:", logger.error)
                     output(e, logger.error)
                     output(e.SourceTraceback(), logger.error)
-                    if e.errno == 5 or e.errno == 3 or e.errno == 0:
+                    if e.errno == 5 or e.errno == 3 or e.errno == 0 or errno == 2:
                         try:
                             ports_still_same = i.getPort() == getTTYFromPath(getSysPathFromTTY(i.getPort()))
                         except:
