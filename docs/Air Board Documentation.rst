@@ -1,4 +1,5 @@
 Air Board Documentation
+=======================
 
 The Air board is a collection of air quality sensors installed in an acrylic box with an Arduino as the interface between the individual sensors and a computer via a UBS to serial connection.
 
