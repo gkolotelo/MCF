@@ -2,3 +2,5 @@
 Version=1.0
 [Project1]
 ProjectPath=Water_Board.PrjPcb
+[Project2]
+ProjectPath=\\vmware-host\Shared Folders\Documents\Projects\Fan Controller\Fan Controller\Fan Controller.PrjPcb
